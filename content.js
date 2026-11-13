@@ -1,4 +1,4 @@
-/* VANISH / ADMINE — isolated-world, local-only page element picker. */
+/* VANISH / ADMINE — page picker. */
 (() => {
   "use strict";
   if (globalThis.__admineVanishReady) return;
@@ -35,7 +35,7 @@
   };
 
   function validSelector(selector) {
-    // Deliberately structural: no IDs, classes, attributes, strings, selectors with url().
+    // Validate structural selectors.
     const grammar = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
     if (typeof selector !== "string" || selector.length > MAX_SELECTOR || !grammar.test(selector) ||
         !selector.split(/\s*>\s*/).slice(1).every(segment=>SAFE_TAGS.has(segment.split(":")[0]))) return false;
@@ -63,7 +63,7 @@
   function styleNode() {
     if (!document.documentElement) return null;
     if (!ruleStyle || !ruleStyle.isConnected) {
-      // Never adopt a page-owned node with the same ID.
+      // Keep a dedicated stylesheet reference.
       ruleStyle = element("style");
       ruleStyle.id = STYLE_ID;
       (document.head || document.documentElement).appendChild(ruleStyle);
@@ -110,7 +110,7 @@
     if (!loaded || stopped || safetyPaused || !document.documentElement) return;
     const started = performance.now();
     const sel = selectors();
-    // A site can replace its <head>; restore the packaged rule sheet without reading or transmitting content.
+    // Keep saved rules active after DOM changes.
     const rulesCSS = sel.map(value => value + " { display: none !important; visibility: hidden !important; pointer-events: none !important; }").join("\n");
     const liveStyle = sel.length ? styleNode() : ruleStyle;
     if (liveStyle && liveStyle.textContent !== rulesCSS) liveStyle.textContent = rulesCSS;
@@ -139,7 +139,7 @@
               }
             }
           }
-        } catch { /* Page markup may be replaced while matching. */ }
+        } catch { /* DOM changed. */ }
       }
     }
     for (const [node, original] of hiddenInline) {
@@ -162,7 +162,7 @@
     cancelInlineOverrides();
     restoreScroll();
     ruleStyle?.remove(); ruleStyle = null;
-    show("Vanish paused", reason + ". Reload the page to retry.");
+    show("Vanish paused", "The page changed too quickly. Reload to retry.");
   }
   function watch() {
     const active = loaded && !stopped && !safetyPaused && selectors().length > 0 && document.documentElement;
@@ -201,7 +201,7 @@
       restoreScroll();
     }
     watch();
-    if (list.length) scan(); // Initial cleanup must restore scroll before reporting success.
+    if (list.length) scan(); // Apply immediately.
   }
   function checkStyle() {
     if (loaded && site.enabled && site.rules.length) {
@@ -332,7 +332,7 @@
           if (!result?.ok) throw new Error(result?.error || "Undo denied");
           site = normalise(result.state);
           apply();
-          show("Restored", "Selection removed from local rules.");
+          show("Restored", "Item is visible again.");
         } catch { show("Restore failed", "Open Vanish and remove the rule manually."); }
       });
       bar.append(undo);
@@ -384,7 +384,7 @@
   }
   async function save(target, exact) {
     const primary = selectorFor(target);
-    if (!primary) return show("Not saved", "No stable, non-identifying selector exists.");
+    if (!primary) return show("Couldn't hide this", "Try selecting a different part of the item.");
     const sel = [primary, ...(exact ? [] : backdrops(target))].filter((value,index,all)=>all.indexOf(value)===index);
     try {
       const result = await chrome.runtime.sendMessage({
@@ -394,9 +394,9 @@
       site = normalise(result.state);
       loaded = true;
       apply();
-      show("Element vanished", "Rule stored locally for this origin.", result.id);
+      show("Gone!", "Saved for this website.", result.id);
     } catch (error) {
-      show("Not saved", error?.message || "Local storage unavailable.");
+      show("Couldn't save", "Try again or choose another element.");
     }
   }
   function pickClick(event) {

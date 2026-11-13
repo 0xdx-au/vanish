@@ -80,8 +80,16 @@ test("no write token or uncontrolled git push in media build; source checks read
   assert.match(verifyWorkflow,/contents: read/);
   assert.match(verifyWorkflow,/browser-acceptance/);
 });
-test("source-available rights reserved and no public support claim", () => {
-  assert.match(licence,/commercial exploitation/i);
-  assert.match(licence,/non-OSI/i);
-  assert.match(read("README.md"),/source-available is not open-source/i);
+test("standard noncommercial licensing and required notices are consistent", () => {
+  assert.match(licence,/PolyForm Noncommercial License 1\.0\.0/);
+  assert.match(licence,/Noncommercial Purposes/);
+  assert.match(licence,/No Other Rights/);
+  assert.match(read("README.md"),/Commercial use is not granted/i);
+  assert.match(read("README.md"),/not an OSI-approved open-source licence/i);
+  assert.match(read("NOTICE"),/Required Notice: Copyright 2026 0xdx-au/);
+  assert.match(read("TRADEMARKS.md"),/does not.*grant permission/i);
+});
+test("popup messaging avoids technical OPSEC inventory", () => {
+  assert.doesNotMatch(html,/NO EXTENSION EGRESS|structural selectors|trusted context/i);
+  assert.doesNotMatch(popup,/\bOPSEC\b|Rule processing exceeded budget/i);
 });

@@ -13,7 +13,7 @@ assert manifest["background"]["service_worker"]=="background.js"
 version=manifest["version"]
 files=[
  "manifest.json","background.js","content.js","popup.js","popup.css","popup.html",
- "README.md","LICENSE","SECURITY.md","docs/PRIVACY-AND-THREAT-MODEL.md",
+ "README.md","LICENSE","NOTICE","TRADEMARKS.md","SECURITY.md","docs/PRIVACY-AND-THREAT-MODEL.md",
  "icons/vanish.svg","icons/icon16.png","icons/icon48.png","icons/icon96.png","icons/icon128.png"
 ]
 dest=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/"dist"/("Vanish-extension-v"+version+".zip")
