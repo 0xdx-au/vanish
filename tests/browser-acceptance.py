@@ -88,6 +88,14 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         check(bool(extension_id),"Real unpacked MV3 extension and worker started")
         target=context.new_page()
         target.goto(origin+"/",wait_until="domcontentloaded")
+        # Prove our independent transport trap actually catches browser egress.
+        target.evaluate("""async()=>{
+          try{await fetch('https://blocked.invalid/probe',{mode:'no-cors'});}catch{}
+        }""")
+        target.wait_for_timeout(250)
+        check(any("blocked.invalid" in entry[1] for entry in proxy_hits),
+              "Local network proxy captures a deliberately blocked control request")
+        proxy_hits.clear();requests.clear()
         popup=context.new_page()
         popup.goto("chrome-extension://"+extension_id+"/popup.html",wait_until="domcontentloaded")
         check(popup.evaluate("async()=>chrome.extension.isAllowedIncognitoAccess()") is False,
