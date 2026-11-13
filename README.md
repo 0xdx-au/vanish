@@ -9,8 +9,8 @@ Vanish is a Chrome Manifest V3 extension for *visual* page cleanup: click an unw
 1. Download this repository as a ZIP from **Code → Download ZIP**, and extract it.
 2. Open `chrome://extensions`, enable **Developer mode** and choose **Load unpacked**.
 3. Select the extracted repository directory containing `manifest.json`. Pin Vanish from the extensions menu.
-4. On an ordinary HTTP(S) site, click Vanish → **SELECT & VANISH**, hover to preview and click. **Shift** selects the exact element; **Esc** cancels.
-5. Undo from the page notice or extension, restore individual rules, pause a site or restore all.
+4. On an ordinary HTTP(S) site, click Vanish → **SELECT & VANISH**. Chrome requests permission for **that origin only**; approve it if you want to activate the picker. Hover to preview and click. **Shift** selects the exact element; **Esc** cancels.
+5. Undo from the page notice or extension, restore individual rules, pause a site or restore all. **Forget site** deletes the local site rules, unregisters persistent injection and removes Chrome's permission for that origin. Reload any currently open tab to fully unload its existing injected script.
 
 Chrome Web Store and `chrome://` pages are not injectable. Some iframes, shadow roots, dynamically generated selectors and server-enforced locks remain outside the capability boundary.
 
@@ -18,22 +18,22 @@ Chrome Web Store and `chrome://` pages are not injectable. Some iframes, shadow 
 
 | Capability | Why it exists | Boundary |
 | --- | --- | --- |
-| `content_scripts` on HTTP(S) pages | Saved selectors must reapply on subsequent visits | No background crawler; no active logging; page data is not sent out |
+| Optional HTTP(S) host permission, granted per origin | Allow a dynamic content script only on sites you explicitly activate | No website content-script access at installation. A deliberate site grant persists until revoked. |
 | `storage` | Save selector, a short locally derived label, per-site enabled flag, optional UI theme | `chrome.storage.local`, **not sync** |
 | `activeTab` | Start the picker in the foreground tab on demand | User gesture required |
-| `scripting` | Re-inject picker on existing tabs opened before installation | Foreground tab only |
+| `scripting` | On permission grant, register a persistent content script for that approved origin; inject into the currently selected tab | Registered sites load automatically on later visits; the first activation is on-demand |
 
-No `tabs`, `webRequest`, `declarativeNetRequest`, `cookies`, `history`, `identity`, `downloads`, `nativeMessaging` or broad extension host networking permission. The content script reads the hostname and DOM only as necessary to identify or hide a selected element; a short label and CSS selectors are persisted **locally**, so avoid using this on highly sensitive pages if even local traces are unacceptable. No cookie or form-value harvesting is implemented.
+No `tabs`, `webRequest`, `declarativeNetRequest`, `cookies`, `history`, `identity`, `downloads`, `nativeMessaging` or always-granted all-site host permission. Chrome shows an origin-specific permission prompt on first activation; the optional host list in the manifest is a request ceiling, **not** default website access. The content script reads the hostname and DOM only as necessary to identify or hide a selected element; a short label and CSS selectors are persisted **locally**, so avoid using this on highly sensitive pages if even local traces are unacceptable. No cookie or form-value harvesting is implemented.
 
 ## OPSEC notes
 - **Extension-originated egress:** None in source. No `fetch`, XHR, WebSocket, sendBeacon, tracking pixel, CDN, remote script/font or remote endpoint. The manifest's extension-page CSP explicitly denies `connect-src`. **This does not make websites offline** and cannot control requests made by page scripts, browsers, other extensions or the OS.
-- **Persistence:** Rules are hostname-scoped and reversible, with a hard maximum of 100 rules per host. Manual use of the Chrome storage API, browser-profile backup, crash reports or a compromised browser are outside this promise.
+- **Persistence:** Rules are hostname-scoped and reversible, with a hard maximum of 100 rules per host. Once an origin is approved, Chrome persists its dynamic site-specific content-script registration until you choose Forget site.  Manual use of the Chrome storage API, browser-profile backup, crash reports or a compromised browser are outside this promise.
 - **Trust:** Published source is inspectable, not independently audited. Install only code you have reviewed; do not trust a repackaged binary. Treat any extension with access to webpages as sensitive software.
 - **Failure mode:** If no stable selector exists, the picker reports that it cannot save the element instead of claiming success. Removing a site element cannot grant access to content that the server did not deliver.
-- **Proof strategy:** Run `node --test tests/*.test.mjs`; read `docs/PRIVACY-AND-THREAT-MODEL.md` and inspect Chrome's extension service worker / popup Network panel and page Network panel separately. A network capture is contextual evidence, not a universal guarantee.
+- **Proof strategy:** Run `node --test tests/*.test.mjs`; read `docs/PRIVACY-AND-THREAT-MODEL.md` and inspect Chrome's popup Network panel and page Network panel separately (there is no extension service worker). A network capture is contextual evidence, not a universal guarantee.
 
 ## Source layout
-- `manifest.json`: permissions, CSP and static content-script registration
+- `manifest.json`: least-privilege permissions, opt-in host access and extension-page CSP
 - `popup.*`: compact ADMINE-branded controls, theme choice and local rule management
 - `content.js`: isolated-world picker and local mutation handling
 - `icons/`: standalone ADMINE contour-A mark with Vanish pink spur
