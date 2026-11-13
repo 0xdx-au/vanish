@@ -42,6 +42,26 @@ jobs:
           command -v ffprobe
       - name: Render and actually exercise the packaged Vanish picker
         run: python scripts/generate_assets.py
+      - name: Package a minimal installable extension ZIP
+        run: |
+          python - <<'PY'
+          import json, zipfile
+          from pathlib import Path
+          manifest=json.loads(Path('manifest.json').read_text())
+          version=manifest['version']
+          target=Path('store-assets')/f'Vanish-extension-v{version}.zip'
+          files=['manifest.json','popup.html','popup.css','popup.js','content.js',
+                 'LICENSE','README.md','SECURITY.md','icons/vanish.svg',
+                 'icons/icon16.png','icons/icon48.png','icons/icon96.png','icons/icon128.png']
+          with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
+              for file in files:
+                  assert Path(file).is_file(),file
+                  z.write(file,file)
+          with zipfile.ZipFile(target) as z:
+              assert z.testzip() is None
+              assert 'manifest.json' in z.namelist()
+          print('Verified installable MV3 archive:',target)
+          PY
       - name: Assert image formats, dimensions and video duration
         run: |
           python - <<'PY'
