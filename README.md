@@ -1,64 +1,58 @@
-# VANISH
-**An ADMINE local-first browser instrument.** Select a nuisance layer. Make it disappear. Keep control.
+# VANISH.
+**ADMINE / LOCAL BROWSER CONTROL** · Less noise. More signal.
 
-Vanish is a Chrome Manifest V3 extension for *visual* page cleanup: click an unwanted modal, banner, overlay or dimmer, inspect what will be hidden, and save a reversible rule for that hostname. It does **not** bypass server-side subscriptions, authorisation, DRM or access controls.
+Vanish v1.3 is a source-available Chrome Manifest V3 extension. Select an unwanted popup or visual layer, hide it locally, and restore it later. It cannot bypass authentication, DRM, server-enforced subscriptions or content that a website never delivered.
 
-> **Privacy boundary:** No analytics, telemetry, tracking identifiers, remote assets, third-party SDKs, account, network API, or extension-initiated outbound requests. Rules stay in Chrome's `chrome.storage.local` on this browser profile. Chrome and visited websites continue their ordinary network activity. Local DOM observation, only while saved rules are active, is used to reapply hiding after page updates; that is not remote monitoring.
+> **OPSEC boundary:** No authored telemetry, remote assets or extension-initiated HTTP requests. Website, Chrome and other software traffic is **not controlled**. No page text or selected element label is persisted. Store only structural selectors and locally approved origins. Source review and CI do **not** constitute an independent security certification.
 
-## Install
-1. Download this repository as a ZIP from **Code → Download ZIP**, and extract it.
-2. Open `chrome://extensions`, enable **Developer mode** and choose **Load unpacked**.
-3. Select the extracted repository directory containing `manifest.json`. Pin Vanish from the extensions menu.
-4. On an ordinary HTTP(S) site, click Vanish → **SELECT & VANISH**. Chrome requests permission for **that origin only**; approve it if you want to activate the picker. Hover to preview and click. **Shift** selects the exact element; **Esc** cancels.
-5. Undo from the page notice or extension, restore individual rules, pause a site or restore all. **Forget site** deletes the local site rules, unregisters persistent injection and removes Chrome's permission for that origin. Reload any currently open tab to fully unload its existing injected script.
+## Install (source-first)
 
-Chrome Web Store and `chrome://` pages are not injectable. Some iframes, shadow roots, dynamically generated selectors and server-enforced locks remain outside the capability boundary.
+1. Verify the source at https://github.com/0xdx-au/vanish ; download this repository as a ZIP and extract it.
+2. In Chrome open `chrome://extensions`, enable **Developer mode**, select **Load unpacked** and choose the directory containing `manifest.json`.
+3. On an HTTP(S) page, open Vanish and choose **Select & Vanish**. Chrome asks for host permission. Grant it only if you trust the page and want persistent rules. Hover to preview, click to hide, hold **Shift** to target an exact element, or press **Esc** to cancel.
+4. Use **Restore**, **Pause**, **Forget hostname** or **Purge all sites**. Forget hostname removes all of that hostname's saved origins (including ports and schemes), revokes matching Chrome host grants and unregisters its scripts. Purge all removes every Vanish grant, rule and preference.
 
-## Permissions and data
+**Chrome host permissions cannot distinguish TCP ports.** Vanish's internal broker checks the full origin, including port, before allowing any storage or rule operation. A content script may technically be injected into another port on a permitted host, but it cannot activate or read rules there without separate origin approval.
 
-| Capability | Why it exists | Boundary |
-| --- | --- | --- |
-| Optional HTTP(S) host permission, granted per origin | Allow a dynamic content script only on sites you explicitly activate | No website content-script access at installation. A deliberate site grant persists until revoked. |
-| `storage` | Save selector, a short locally derived label, per-site enabled flag, optional UI theme | `chrome.storage.local`, **not sync** |
-| `activeTab` | Start the picker in the foreground tab on demand | User gesture required |
-| `scripting` | On permission grant, register a persistent content script for that approved origin; inject into the currently selected tab | Registered sites load automatically on later visits; the first activation is on-demand |
+**Incognito is disabled entirely.** Vanish cannot be enabled for private browsing; Chrome extension-local storage is shared with the profile and is not an encrypted vault. No file URLs, browser internal pages or Chrome Web Store pages are supported.
 
-No `tabs`, `webRequest`, `declarativeNetRequest`, `cookies`, `history`, `identity`, `downloads`, `nativeMessaging` or always-granted all-site host permission. Chrome shows an origin-specific permission prompt on first activation; the optional host list in the manifest is a request ceiling, **not** default website access. The content script reads the hostname and DOM only as necessary to identify or hide a selected element; a short label and CSS selectors are persisted **locally**, so avoid using this on highly sensitive pages if even local traces are unacceptable. No cookie or form-value harvesting is implemented.
+### Important upgrade notice — v1.2 → v1.3
 
-## OPSEC notes
-- **Extension-originated egress:** None in source. No `fetch`, XHR, WebSocket, sendBeacon, tracking pixel, CDN, remote script/font or remote endpoint. The manifest's extension-page CSP explicitly denies `connect-src`. **This does not make websites offline** and cannot control requests made by page scripts, browsers, other extensions or the OS.
-- **Persistence:** Rules are hostname-scoped and reversible, with a hard maximum of 100 rules per host. Once an origin is approved, Chrome persists its dynamic site-specific content-script registration until you choose Forget site.  Manual use of the Chrome storage API, browser-profile backup, crash reports or a compromised browser are outside this promise.
-- **Trust:** Published source is inspectable, not independently audited. Install only code you have reviewed; do not trust a repackaged binary. Treat any extension with access to webpages as sensitive software.
-- **Failure mode:** If no stable selector exists, the picker reports that it cannot save the element instead of claiming success. Removing a site element cannot grant access to content that the server did not deliver.
-- **Proof strategy:** Run `node --test tests/*.test.mjs`; read `docs/PRIVACY-AND-THREAT-MODEL.md` and inspect Chrome's popup Network panel and page Network panel separately (there is no extension service worker). A network capture is contextual evidence, not a universal guarantee.
+Version 1.2 could save up to 64 characters of selected webpage text as a rule label. **The v1.3 upgrade intentionally deletes every old `vanish.site.*` record, existing permission and old injected script registration** to remove this data. Users must approve sites and reselect elements. Reload tabs already open during the upgrade to unload previously injected scripts. **Do not distribute the old v1.2.0 extension ZIP.**
 
-## Source layout
-- `manifest.json`: least-privilege permissions, opt-in host access and extension-page CSP
-- `popup.*`: compact ADMINE-branded controls, theme choice and local rule management
-- `content.js`: isolated-world picker and local mutation handling
-- `icons/`: standalone ADMINE contour-A mark with Vanish pink spur
-- `docs/PRIVACY-AND-THREAT-MODEL.md`: explicit data-flow and limitations
-- `SECURITY.md`: private vulnerability disclosure and support boundaries
-- `LICENSE`: **source-available personal/noncommercial permission; commercial rights reserved**
+## Architecture
 
-## Chrome Web Store assets
+| Layer | Authority | Stored information |
+|---|---|---|
+| Popup | User-initiated Chrome host permission, per-origin management | Generic UI text, optional theme |
+| Isolated content script | User picker, page CSS, best-effort scroll recovery | **No direct storage access**, no copied page text |
+| Privileged `background.js` service worker | Validates origin approvals, storage schema and permissions; enforces revocation | Origin list, structural CSS paths and rule IDs |
+| Chrome `storage.local` | Not synced by Vanish; access restricted to trusted extension contexts | Origin-scoped rules, approved origins; local profile only |
+| Network | No Vanish application-level network API | Nothing intentionally sent to ADMINE |
 
-The repository includes a reproducible [store asset pack](https://github.com/0xdx-au/vanish/tree/main/store-assets) with:
+Selector paths only contain structural HTML tags and `:nth-of-type` positions. Site layout structure and approved origins can still be sensitive browsing metadata, accessible to someone with control of the Chrome profile. Rules are limited to 24 per origin, with bounded matching, mutation debounce and a fail-safe pause on hostile page activity. If no safe selector exists, Vanish refuses to save it.
 
-- **96×96 Vanish identity logo** and a **128×128 PNG store icon** with 16px transparent padding.
-- **Four 1280×800 RGB screenshots**, plus 440×280 and 1400×560 promotional tiles.
-- **10-second MP4** of the published content script selecting and hiding a synthetic-page interruption in Chromium, with mocked extension messaging/storage. This demonstrates the DOM picker and is **not** a full installed-MV3 acceptance test.
-- **Installable minimal extension ZIP** packaged from the manifest, interface, content script, local icons and policy files.
+The extension changes DOM visibility, not HTTP routing or website access permissions. The site can observe and reverse those changes.
 
-The Chrome Web Store global promo-video field accepts a genuine YouTube URL only. An MP4 or GitHub link cannot be pasted there: the operator must upload the file to a YouTube account they control. Store assets are produced by [the generator](https://github.com/0xdx-au/vanish/blob/main/scripts/generate_assets.py) and verified by the GitHub Actions media workflow.
+## Security testing and release
 
-## Public interaction boundaries
+- `node --test tests/security-contract.test.mjs`: static policy tests for permissions, persistence, origin handling, no network APIs, and read-only publishing.
+- `python tests/browser-acceptance.py` (with Playwright Chromium installed): genuine unpacked extension runtime checks on loopback fixtures, including denied access, Incognito prohibition, Chrome grant, DOM selection, origin isolation, unsafe CSS rejection, mutation storm fail-safe, revocation and request observations.
+- `.github/workflows/verify.yml`: pinned GitHub Actions, read-only token, real Chromium test.
+- `.github/workflows/store-assets.yml`: produces **reviewable build artifacts only**, with a read-only GitHub token. It cannot commit or push unreviewed media or extension packages to `main`.
 
-The [ADMINE Vanish project page](https://admine.au/projects/vanish/) does not embed comments. GitHub Discussions are disabled. This repository intentionally has no public support commitment. To disable **GitHub Issues** and the **Wiki**, the repository owner must change **Settings → General → Features**; the published ISSUE_TEMPLATE config disables blank public issue forms but does not itself disable the GitHub Issues feature. A public repository cannot categorically prevent comments on pull-request conversations. For sensitive vulnerabilities use the private channel in `SECURITY.md`.
+**Do not confuse the store demonstration with proof.** The existing ten-second promotional video uses a synthetic page and mocked extension messages for presentation. The separate real-browser tests are the acceptance evidence. No single source scan or network test can prove universal absence of browser/network egress or resistance to every malicious webpage.
+
+## Public assets and provenance
+
+The historical `store-assets/` directory includes exact-size store icons and imagery. The **v1.2.0 ZIP in that directory is obsolete**. Obtain the current v1.3 source from a verified GitHub commit; review the release workflow artifact before publishing a Chrome Web Store package.
+
+Detailed boundaries: [Privacy & threat model](docs/PRIVACY-AND-THREAT-MODEL.md) · [Security policy](SECURITY.md) · [ADMINE project page](https://admine.au/projects/vanish/).
+
+The ADMINE page has no comments. GitHub Discussions are disabled, while Issues and Wiki require owner-side GitHub repository setting changes; disabling blank issue templates alone does not switch them off. Do not post sensitive security findings publicly.
 
 ## Licensing and owner protection
-Copyright © 2026 0xdx-au. **Source-available is not open-source (OSI).** Individuals may inspect, install, run and adapt Vanish privately for non-commercial personal use under the accompanying license. **No other person may sell, sublicense, bundle for sale, redistribute or commercially exploit Vanish without written permission from the copyright holder.** The copyright holder retains the right to license or sell it commercially at their discretion. Public visibility does not cancel these conditions; it also does not technically prevent cloning or infringement. ADMINE marks remain reserved.
 
-This repository accepts **no public support commitments or discussions**. See `SECURITY.md` for private disclosure.
+Copyright © 2026 0xdx-au. **Source-available is not open-source (OSI).** The accompanying [Personal Use Licence 1.0](LICENSE) permits individual, private, non-commercial use and inspection. Third parties cannot sell, sublicense, commercially redistribute, or otherwise commercially exploit Vanish without separate written permission from the rights holder. The owner reserves the right to license or sell the product commercially at their discretion. Public visibility cannot technically prevent unauthorised copying; enforcement is a legal matter. ADMINE marks are reserved.
 
-**ADMINE — Less noise. More signal.** · https://admine.au/projects/vanish/
+**ADMINE — Less noise. More signal.**
