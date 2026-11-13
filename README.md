@@ -94,7 +94,7 @@ Rules are stored locally in Chrome and can be removed at any time. Chrome and th
 - **Incognito mode is not supported.**
 - Removing an overlay cannot guarantee that a website will continue working.
 
-For the **Chrome Web Store privacy policy**, use [Vanish's dedicated HTTPS policy](https://admine.au/vanish-privacy.html). For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md).
+For the **Chrome Web Store privacy policy**, use [Vanish's dedicated HTTPS policy](https://admine.au/vanish-privacy). For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md).
 
 ## Compatibility and limits
 
