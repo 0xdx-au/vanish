@@ -94,7 +94,7 @@ Rules are stored locally in Chrome and can be removed at any time. Chrome and th
 - **Incognito mode is not supported.**
 - Removing an overlay cannot guarantee that a website will continue working.
 
-For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md). Technical documentation is available without filling the main interface with engineering details.
+For the **Chrome Web Store privacy policy**, use [Vanish's dedicated HTTPS policy](https://admine.au/vanish-privacy.html). For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md).
 
 ## Compatibility and limits
 
@@ -111,6 +111,10 @@ The repository includes tests for permissions, local data handling, page-element
 [View verification runs](https://github.com/0xdx-au/vanish/actions/workflows/verify.yml) · [Review the source](https://github.com/0xdx-au/vanish)
 
 No browser extension can promise compatibility with every website or absolute security. These tests provide repeatable evidence for the version being tested.
+
+## Chrome Web Store publication
+
+Publishing Vanish yourself? The [store asset checklist](store-assets/README.md) includes direct screenshot downloads (1280×800 PNGs) and the **privacy policy URL** required by the Chrome Web Store. Images shown on GitHub or ADMINE must still be uploaded directly to the extension's Store listing, and the privacy URL must be entered on the Privacy tab.
 
 ## Licence
 
