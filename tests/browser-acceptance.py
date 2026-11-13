@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from tempfile import TemporaryDirectory
-import json, time
+import json, time, os, subprocess
 from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
 
@@ -64,7 +64,7 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
     requests=[]
     try:
         context=p.chromium.launch_persistent_context(
-            profile,channel="chromium",headless=True,
+            profile,channel="chromium",headless=os.getenv("VANISH_HEADED") != "1",
             args=["--disable-extensions-except="+str(ROOT),
                   "--load-extension="+str(ROOT),
                   "--disable-background-networking","--no-first-run"])
@@ -94,6 +94,10 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
           document.body.append(button);
         }""","http://127.0.0.1/*")
         popup.locator("#test-permission").click()
+        if os.getenv("VANISH_HEADED")=="1":
+            time.sleep(0.8)
+            # Chrome's extension permission bubble is browser UI, not a DOM dialog.
+            subprocess.run(["xdotool","key","Return"],check=True)
         popup.locator('body[data-permission-finished="1"]').wait_for(timeout=12000)
         if popup.evaluate("window.permissionResultError"): raise RuntimeError(popup.evaluate("window.permissionResultError"))
         granted=popup.evaluate("window.permissionResult")
