@@ -3,7 +3,7 @@
   "name": "Vanish — ADMINE",
   "short_name": "Vanish",
   "description": "Local-first visual cleanup. Opt-in per-site permission, no telemetry, reversible rules.",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "minimum_chrome_version": "116",
   "permissions": [
     "storage",
