@@ -1,30 +1,27 @@
-# Security policy and private disclosure
+# VANISH security policy
 
-Vanish is a browser extension with access to page DOMs and therefore has a sensitive trust boundary. The source is published for independent review, not as evidence of a completed external security audit.
+Vanish has privileged access to approved webpages. It is a **visual-cleanup tool**, not a paywall bypass or independently audited security product. Do not submit sensitive URLs, page contents, private browser data or vulnerabilities through public comments or GitHub issues. Use the ADMINE private contact route at https://admine.au/security/ .
 
-**Do not post vulnerabilities, affected URLs, exploit payloads, browser profiles, cookies, screenshots or private website content to a public GitHub Issue or Discussion.** Use ADMINE's current private contact channel documented at https://admine.au/security/ . Do not assume a particular email address is configured without checking the website.
+## Security boundaries
 
-## Scope
-- Manifest V3 permissions and whether a permission can be removed
-- Picker integrity, selector persistence, DOM mutation safety and scrolling restoration
-- Privacy claims, accidental extension-initiated egress and package contamination
-- Host isolation, stored labels, and extension UI content injection
+Version 1.3 enforces:
+- **Incognito prohibited** using a manifest declaration.
+- **No page text persistence:** only validated structural selectors, generic UI labels and exact origin identifiers are stored locally.
+- **Origin approval via trusted worker:** all content-script storage goes through `background.js`, with exact origin checks. Chrome host permission itself cannot isolate ports.
+- **Fail-closed legacy migration:** v1.2 stored rules and permissions are purged on upgrade; open tabs must be reloaded to remove already-injected scripts.
+- **One-click revocation:** Forget hostname removes all matching origin records, scripts and grants; Purge all removes every Vanish site record and grant. Check for errors rather than assuming success.
+- **Performance fail-safe:** mutation flood, too many DOM matches, or expensive scans disconnect observation and restore previously hidden elements.
+- **No app egress:** no authored network APIs, telemetry or remote assets. Browser/site traffic is not controlled.
 
-## Non-goals / caveats
-- This is a visual-only element remover, **not** a paywall or authentication bypass.
-- Page JavaScript can observe DOM changes. A malicious page, another extension, or compromised browser can interfere with selection or infer interaction.
-- No promise is made to support every DOM structure, closed shadow root, iframe, hostile site, or browser build.
-- No external pen-test or independent security certification is claimed.
+## Release checklist
 
-The GitHub repository is intended as a code reference, not a public support channel. Public Issues, Discussions and Wiki should be disabled in repository settings by the maintainer. The site project page provides no comments form. If a public issue or PR thread exists, do not disclose sensitive material there.
+1. Run the source-policy checks and **real unpacked Chromium tests**, including denied permissions, accepted permissions, different ports, hostile selector rejection, stress activity and revocation.
+2. Test an upgrade from v1.2. Verify the legacy `vanish.site.*` keys are gone, Chrome grants and injected scripts removed after tab reload, and users are informed that rules were intentionally reset.
+3. Ensure media CI and source CI both have `contents: read`, have no `git push`, and do not distribute generated artifacts without separate review.
+4. Confirm `manifest.json` contains only `storage`, `activeTab`, `scripting`, optional HTTP(S) host access, the `background.js` worker, and `incognito: not_allowed`.
+5. Test theme, keyboard cancellation, selecting a modal, backdrop hiding, scroll restoration, restore, pause, Forget hostname and Purge all on actual installed Chrome, not only a mocked fixture.
+6. Inspect network use in extension service worker and popup separately from website requests. A clean test is evidence, not a universal absence-of-egress proof.
+7. Release only a package built from the validated commit. Do not reuse the v1.2 ZIP as a current release.
+8. Confirm GitHub Issues/Wiki and public discussion settings with repository ownership. The connected GitHub API may not expose these administration settings.
 
-## Operator release checklist
-1. Confirm `manifest.json` has exactly `storage`, `activeTab`, `scripting`, **no static content scripts**, and optional HTTP(S) host permissions granted individually by explicit user gesture.
-2. Review code for new `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, dynamic `import()`, externally hosted assets, or analytics SDKs.
-3. Verify `chrome.storage.local` only; never sync page-derived data.
-4. Inspect the Chrome Extensions page to verify all loaded unpacked files came from this repository.
-5. Exercise first-run permission approval/denial, site-specific dynamic injection, install, first-open tab, select, pause, undo, restore, **Forget site**, refresh, SPA DOM recreation and unsupported-page errors.
-6. Verify permission revocation removes the origin's dynamic registration and saved selectors. Verify the popup's Network panel shows no extension-originated network requests. Distinguish website/Chrome traffic and document uncertainty.
-7. Confirm public repository metadata, licence status and no accidental secrets or personal information before releasing.
-
-Any future network-capable feature must be a separate, explicitly reviewed security/privacy change; it cannot silently weaken the local-only claim.
+The source has **not** been independently penetration tested. Chrome, local administrators, a compromised browser/extension profile and malicious extensions remain trusted boundary risks. Existing page changes may persist after extension revocation until a tab reload. All rights not expressly licensed in `LICENSE` remain reserved.
