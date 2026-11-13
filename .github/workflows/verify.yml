@@ -42,5 +42,9 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check playwright==1.57.0
           python -m playwright install chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb xdotool
       - name: Real unpacked MV3 permission / privacy / hostile DOM / egress test
-        run: python tests/browser-acceptance.py
+        env:
+          VANISH_HEADED: "1"
+        run: xvfb-run -a python tests/browser-acceptance.py
