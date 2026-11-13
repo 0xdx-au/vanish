@@ -261,7 +261,7 @@
     if (!["fixed", "absolute"].includes(style.position) || style.display === "none") return false;
     const name = node.id + " " + (typeof node.className === "string" ? node.className : "");
     return /backdrop|scrim|dimmer|underlay|shade|mask/i.test(name) ||
-      ((node.textContent || "").trim().length < 22 &&
+      (node.childElementCount === 0 &&
       !["transparent", "rgba(0, 0, 0, 0)"].includes(style.backgroundColor));
   }
   function backdrops(primary) {
