@@ -19,12 +19,12 @@ Vanish is a browser extension with access to page DOMs and therefore has a sensi
 The GitHub repository is intended as a code reference, not a public support channel. Public Issues, Discussions and Wiki should be disabled in repository settings by the maintainer. The site project page provides no comments form. If a public issue or PR thread exists, do not disclose sensitive material there.
 
 ## Operator release checklist
-1. Confirm `manifest.json` has exactly `storage`, `activeTab`, `scripting`, and the intentionally broad static HTTP(S) content-script scope.
+1. Confirm `manifest.json` has exactly `storage`, `activeTab`, `scripting`, **no static content scripts**, and optional HTTP(S) host permissions granted individually by explicit user gesture.
 2. Review code for new `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, dynamic `import()`, externally hosted assets, or analytics SDKs.
 3. Verify `chrome.storage.local` only; never sync page-derived data.
 4. Inspect the Chrome Extensions page to verify all loaded unpacked files came from this repository.
-5. Exercise install, first-open tab, select, pause, undo, restore, refresh, SPA DOM recreation and unsupported-page errors.
-6. Verify the popup's Network panel shows no extension-originated network requests. Distinguish website/Chrome traffic and document uncertainty.
+5. Exercise first-run permission approval/denial, site-specific dynamic injection, install, first-open tab, select, pause, undo, restore, **Forget site**, refresh, SPA DOM recreation and unsupported-page errors.
+6. Verify permission revocation removes the origin's dynamic registration and saved selectors. Verify the popup's Network panel shows no extension-originated network requests. Distinguish website/Chrome traffic and document uncertainty.
 7. Confirm public repository metadata, licence status and no accidental secrets or personal information before releasing.
 
 Any future network-capable feature must be a separate, explicitly reviewed security/privacy change; it cannot silently weaken the local-only claim.
