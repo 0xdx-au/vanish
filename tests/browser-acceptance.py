@@ -106,7 +106,7 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         target.mouse.move(570,310)
         target.mouse.click(570,310)
         target.wait_for_function("getComputedStyle(document.querySelector('#modal')).display==='none'",timeout=8000)
-        check(target.evaluate("getComputedStyle(document.querySelector('#shade')).display")==="none",
+        check(target.evaluate("getComputedStyle(document.querySelector('#shade')).display")=="none",
               "Actual popup and backdrop hidden")
         check(target.evaluate("getComputedStyle(document.body).overflowY")!="hidden",
               "Scroll was unlocked")
