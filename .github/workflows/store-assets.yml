@@ -1,0 +1,69 @@
+name: Generate Chrome Web Store assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/generate_assets.py
+      - .github/workflows/store-assets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vanish-store-assets
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Vanish source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - name: Install asset tools
+        run: |
+          python -m pip install --disable-pip-version-check pillow==12.3.0 cairosvg==2.8.2 playwright==1.57.0
+          python -m playwright install --with-deps chromium ffmpeg
+      - name: Render and actually exercise the packaged Vanish picker
+        run: python scripts/generate_assets.py
+      - name: Assert image formats, dimensions and video duration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import subprocess,json
+          root=Path('store-assets')
+          expected={'vanish-logo-96x96.png':(96,96),
+                    'store-icon-128x128.png':(128,128),
+                    'small-promo-440x280.png':(440,280),
+                    'marquee-promo-1400x560.png':(1400,560)}
+          for name,sz in expected.items():
+              assert Image.open(root/name).size==sz
+          assert Image.open(root/'store-icon-128x128.png').getpixel((0,0))[3]==0
+          screenshots=list((root/'screenshots').glob('*.png'))
+          assert len(screenshots)==4
+          for shot in screenshots:
+              im=Image.open(shot)
+              assert im.size==(1280,800) and im.mode=='RGB'
+          meta=json.loads(subprocess.check_output(['ffprobe','-v','quiet','-show_entries','format=duration','-of','json',str(root/'vanish-working-demo-10s.mp4')]))
+          assert abs(float(meta['format']['duration'])-10)<.06
+          PY
+      - name: Commit verified assets to the public repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add icons/icon96.png icons/icon128.png store-assets/
+          if git diff --staged --quiet; then
+            echo "All generated artifacts are already current."
+          else
+            git commit -m "assets: publish exact-size store artwork and verified 10s demo"
+            git push origin HEAD:main
+          fi
