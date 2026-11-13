@@ -41,6 +41,21 @@ No `tabs`, `webRequest`, `declarativeNetRequest`, `cookies`, `history`, `identit
 - `SECURITY.md`: private vulnerability disclosure and support boundaries
 - `LICENSE`: **source-available personal/noncommercial permission; commercial rights reserved**
 
+## Chrome Web Store assets
+
+The repository includes a reproducible [store asset pack](https://github.com/0xdx-au/vanish/tree/main/store-assets) with:
+
+- **96×96 Vanish identity logo** and a **128×128 PNG store icon** with 16px transparent padding.
+- **Four 1280×800 RGB screenshots**, plus 440×280 and 1400×560 promotional tiles.
+- **10-second MP4** of the published content script selecting and hiding a synthetic-page interruption in Chromium, with mocked extension messaging/storage. This demonstrates the DOM picker and is **not** a full installed-MV3 acceptance test.
+- **Installable minimal extension ZIP** packaged from the manifest, interface, content script, local icons and policy files.
+
+The Chrome Web Store global promo-video field accepts a genuine YouTube URL only. An MP4 or GitHub link cannot be pasted there: the operator must upload the file to a YouTube account they control. Store assets are produced by [the generator](https://github.com/0xdx-au/vanish/blob/main/scripts/generate_assets.py) and verified by the GitHub Actions media workflow.
+
+## Public interaction boundaries
+
+The [ADMINE Vanish project page](https://admine.au/projects/vanish/) does not embed comments. GitHub Discussions are disabled. This repository intentionally has no public support commitment. To disable **GitHub Issues** and the **Wiki**, the repository owner must change **Settings → General → Features**; the published ISSUE_TEMPLATE config disables blank public issue forms but does not itself disable the GitHub Issues feature. A public repository cannot categorically prevent comments on pull-request conversations. For sensitive vulnerabilities use the private channel in `SECURITY.md`.
+
 ## Licensing and owner protection
 Copyright © 2026 0xdx-au. **Source-available is not open-source (OSI).** Individuals may inspect, install, run and adapt Vanish privately for non-commercial personal use under the accompanying license. **No other person may sell, sublicense, bundle for sale, redistribute or commercially exploit Vanish without written permission from the copyright holder.** The copyright holder retains the right to license or sell it commercially at their discretion. Public visibility does not cancel these conditions; it also does not technically prevent cloning or infringement. ADMINE marks remain reserved.
 
