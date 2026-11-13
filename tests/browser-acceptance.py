@@ -97,10 +97,11 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         if os.getenv("VANISH_HEADED")=="1":
             time.sleep(0.8)
             # Chrome's extension permission bubble is browser UI, not a DOM dialog.
-            subprocess.run(["xdotool","key","Return"],check=True)
+            subprocess.run(["xdotool","key","Tab","Return"],check=True)
         popup.locator('body[data-permission-finished="1"]').wait_for(timeout=12000)
         if popup.evaluate("window.permissionResultError"): raise RuntimeError(popup.evaluate("window.permissionResultError"))
         granted=popup.evaluate("window.permissionResult")
+        print("CHROME PERMISSION DECISION:",granted,flush=True)
         check(granted is True,"Real Chrome optional host permission granted from click")
         response=broker(popup,"ADMIN_APPROVE",{"origin":origin})
         check(response.get("ok") is True,"Approved origin registered by trusted worker")
