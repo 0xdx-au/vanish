@@ -1,49 +1,74 @@
+/* VANISH / ADMINE — network-free extension control. */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const ui = {domain:$("domain"),count:$("count"),pick:$("pick"),rules:$("rules"),undo:$("undo"),
-    restore:$("restore"),forget:$("forget"),access:$("access"),enabled:$("enabled"),status:$("status"),theme:$("theme")};
-  const prefKey = "vanish.preferences";
-  let key = null, tabId = null, hostPattern = null, scriptId = null, state = {enabled:true,rules:[]};
-
-  function normalise(raw) {
-    return {enabled:raw?.enabled!==false,rules:Array.isArray(raw?.rules)?raw.rules.filter(r =>
-      r && typeof r.id==="string" && Array.isArray(r.selectors)).slice(0,100):[]};
+  const ui = {domain:$("domain"),count:$("count"),pick:$("pick"),rules:$("rules"),
+    undo:$("undo"),restore:$("restore"),forget:$("forget"),forgetAll:$("forget-all"),
+    access:$("access"),enabled:$("enabled"),status:$("status"),theme:$("theme")};
+  const prefKey="vanish.preferences";
+  let tabId=null,origin=null,hostname=null,approved=false,ready=false;
+  let state={enabled:true,rules:[]};
+  const announce=message=>{ui.status.textContent=message;};
+  function el(tag,name,value) {
+    const e=document.createElement(tag);
+    if(name)e.className=name;
+    if(value!==undefined)e.textContent=value;
+    return e;
   }
-  const announce = message => {ui.status.textContent = message;};
-  function empty(message) {const x=document.createElement("div");x.className="empty";x.textContent=message;return x;}
+  async function ask(type,options={}) {
+    const response=await chrome.runtime.sendMessage({type,...options});
+    if(!response?.ok)throw new Error(response?.error||"Extension request rejected");
+    return response;
+  }
   function unavailable(message) {
-    ui.domain.textContent=message; ui.count.textContent="Unavailable";
-    for(const item of [ui.pick,ui.undo,ui.restore,ui.forget,ui.enabled]) item.disabled=true;
-    ui.access.textContent = "This page cannot grant Vanish access.";
-    ui.rules.replaceChildren(empty("Open an ordinary HTTP(S) page."));
+    ui.domain.textContent=message;
+    ui.count.textContent="Unavailable";
+    for(const x of [ui.pick,ui.undo,ui.restore,ui.forget,ui.enabled])x.disabled=true;
+    ui.access.textContent="Open an ordinary HTTP(S) webpage.";
+    ui.rules.replaceChildren(el("div","empty","No active site."));
   }
   function draw() {
-    ui.enabled.checked=state.enabled;
     ui.count.textContent=state.rules.length+" saved";
-    ui.undo.disabled=ui.restore.disabled=state.rules.length===0;
+    ui.enabled.checked=state.enabled;
+    ui.enabled.disabled=!approved||!ready;
+    ui.forget.disabled=!approved||!ready;
+    ui.undo.disabled=ui.restore.disabled=state.rules.length===0||!ready;
     ui.rules.replaceChildren();
-    if(!state.rules.length){ui.rules.append(empty("Nothing hidden. Select a page element to begin."));return;}
-    for(const rule of [...state.rules].reverse()){
-      const row=document.createElement("div");row.className="rule";
-      const copy=document.createElement("div");copy.className="rule-label";
-      const title=document.createElement("strong");title.textContent=rule.label||"Hidden item";title.title=title.textContent;
-      const detail=document.createElement("small");detail.textContent=rule.unlockScroll?"Overlay / scroll recovery":"Element / visual rule";
+    if(!state.rules.length) {
+      ui.rules.append(el("div","empty","Nothing hidden on this origin."));
+      return;
+    }
+    for(let i=state.rules.length-1;i>=0;i--){
+      const rule=state.rules[i],row=el("div","rule"),copy=el("div","rule-label");
+      const title=el("strong","","Hidden element "+String(i+1).padStart(2,"0"));
+      const detail=el("small","",rule.unlockScroll?"Overlay / scroll repair":"Visual selection");
       copy.append(title,detail);
-      const button=document.createElement("button");button.type="button";button.textContent="Restore";
-      button.setAttribute("aria-label","Restore "+title.textContent);
-      button.addEventListener("click",()=>change(next=>{next.rules=next.rules.filter(r=>r.id!==rule.id);},"Item restored."));
-      row.append(copy,button);ui.rules.append(row);
+      const restore=el("button","","Restore");restore.type="button";restore.disabled=!approved;
+      restore.setAttribute("aria-label","Restore hidden element "+(i+1));
+      restore.addEventListener("click",()=>mutate("ADMIN_REMOVE",{id:rule.id},"Element restored."));
+      row.append(copy,restore);ui.rules.append(row);
     }
   }
-  async function change(mutator,message){
-    if(!key)return;
+  async function refresh(){
+    if(!origin)return;
+    const data=await ask("ADMIN_READ",{origin});
+    state=data.state;approved=data.approved;ready=true;
+    ui.access.textContent=approved?
+      "✓ Approved origin. Local rules only.":
+      "No approval for this origin. Chrome will ask on selection.";
+    draw();
+  }
+  async function refreshTab(){
+    if(!tabId)return;
+    try{await chrome.tabs.sendMessage(tabId,{type:"RULES_REFRESH"},{frameId:0});}
+    catch{/* Tab may have no content script. */}
+  }
+  async function mutate(type,options,message){
+    if(!origin)return;
     try{
-      const result=await chrome.storage.local.get(key);
-      const next=normalise(result[key]);mutator(next);
-      await chrome.storage.local.set({[key]:next});
-      state=next;draw();announce(message);
-    }catch(error){announce("Could not save: "+(error?.message||"storage unavailable"));}
+      const response=await ask(type,{origin,...options});
+      state=response.state;draw();await refreshTab();announce(message);
+    }catch(error){announce("Change failed: "+error.message);}
   }
   async function deliver(message){
     try{return await chrome.tabs.sendMessage(tabId,message,{frameId:0});}
@@ -52,74 +77,68 @@
       return chrome.tabs.sendMessage(tabId,message,{frameId:0});
     }
   }
-  async function ensureHostAccess() {
-    if (!hostPattern || !scriptId) throw new Error("Unsupported page");
-    // This API is deliberately first in the click's async path: Chrome requires a user gesture.
-    const approved = await chrome.permissions.request({origins:[hostPattern]});
-    if (!approved) throw new Error("Site access declined; nothing was changed");
-    const registered = await chrome.scripting.getRegisteredContentScripts({ids:[scriptId]});
-    if (!registered.length) {
-      await chrome.scripting.registerContentScripts([{
-        id:scriptId,matches:[hostPattern],js:["content.js"],
-        runAt:"document_start",allFrames:false,persistAcrossSessions:true
-      }]);
-    }
-    ui.access.textContent = "✓ Permission granted for this website only.";
-    ui.forget.disabled = false;
-  }
   ui.pick.addEventListener("click",async()=>{
+    if(!origin||!hostname)return;
     ui.pick.disabled=true;
     try{
-      await ensureHostAccess();
+      const url=new URL(origin);
+      // This must be the first await after the click so Chrome retains the user gesture.
+      const granted=await chrome.permissions.request({origins:[url.protocol+"//"+url.hostname+"/*"]});
+      if(!granted)throw new Error("Permission declined. No changes were saved.");
+      await ask("ADMIN_APPROVE",{origin});
+      await refresh();
       const result=await deliver({type:"START_PICK"});
-      if(!result?.ok)throw new Error(result?.error||"picker unavailable");
+      if(!result?.ok)throw new Error(result?.error||"Picker unavailable");
       window.close();
-    }catch(error){announce("Picker unavailable: "+(error?.message||"try reloading"));ui.pick.disabled=false;}
+    }catch(error){announce(error.message||"Picker unavailable");ui.pick.disabled=false;}
   });
-  ui.forget.addEventListener("click", async () => {
-    if (!key || !hostPattern || !scriptId) return;
+  ui.undo.addEventListener("click",()=>{
+    const last=state.rules.at(-1);
+    if(last)void mutate("ADMIN_REMOVE",{id:last.id},"Last selection restored.");
+  });
+  ui.restore.addEventListener("click",()=>mutate("ADMIN_CLEAR",{},"Origin rules cleared."));
+  ui.enabled.addEventListener("change",()=>mutate("ADMIN_TOGGLE",{enabled:ui.enabled.checked},
+    ui.enabled.checked?"Hiding resumed.":"Hiding paused."));
+  ui.forget.addEventListener("click",async()=>{
+    if(!hostname)return;
     ui.forget.disabled=true;
-    try {
-      // Remove stored selectors first; an already-running script then restores the page.
-      await chrome.storage.local.remove(key);
-      const scripts=await chrome.scripting.getRegisteredContentScripts({ids:[scriptId]});
-      if (scripts.length) await chrome.scripting.unregisterContentScripts({ids:[scriptId]});
-      const revoked=await chrome.permissions.remove({origins:[hostPattern]});
-      state={enabled:true,rules:[]};draw();
-      ui.access.textContent=revoked?"No site permission. Access fully revoked.":"No site permission is currently granted.";
-      announce("Site data cleared. Reload the tab to unload its existing script.");
-    } catch(error) {
-      announce("Incomplete site reset: "+(error?.message||"check Chrome site permissions"));
-      ui.forget.disabled=false;
-    }
+    try{
+      const result=await ask("ADMIN_FORGET_HOST",{hostname});
+      state={enabled:true,rules:[]};approved=false;draw();
+      ui.access.textContent="Hostname permissions and local rules revoked.";
+      announce("Revoked "+result.revokedOrigins+" approved origins. Reload open tabs.");
+    }catch(error){announce("Revocation incomplete: "+error.message);ui.forget.disabled=false;}
   });
-  ui.undo.addEventListener("click",()=>change(next=>{next.rules.pop();},"Last rule restored."));
-  ui.restore.addEventListener("click",()=>change(next=>{next.rules=[];},"Site rules cleared."));
-  ui.enabled.addEventListener("change",()=>change(next=>{next.enabled=ui.enabled.checked;},ui.enabled.checked?"Hiding enabled.":"Hiding paused."));
+  ui.forgetAll.addEventListener("click",async()=>{
+    ui.forgetAll.disabled=true;
+    try{
+      await ask("ADMIN_CLEAR_ALL");
+      state={enabled:true,rules:[]};approved=false;draw();
+      ui.access.textContent="All sites cleared and permissions revoked.";
+      announce("All sites reset. Reload already-open tabs.");
+    }catch(error){announce("Global reset incomplete: "+error.message);}
+    finally{ui.forgetAll.disabled=false;}
+  });
   ui.theme.addEventListener("change",async()=>{
-    const theme=ui.theme.value;
-    document.documentElement.dataset.theme=theme;
-    try{await chrome.storage.local.set({[prefKey]:{theme}});}catch{announce("Appearance preference could not be saved.");}
+    const theme=ui.theme.value;document.documentElement.dataset.theme=theme;
+    try{await chrome.storage.local.set({[prefKey]:{theme}});}
+    catch{announce("Theme preference was not saved.");}
   });
   chrome.storage.onChanged.addListener((changes,area)=>{
-    if(area==="local"&&key&&Object.hasOwn(changes,key)){state=normalise(changes[key].newValue);draw();}
+    if(area!=="local"||!origin)return;
+    if(Object.hasOwn(changes,"vanish.rules.v3."+encodeURIComponent(origin)))
+      void refresh().catch(()=>{});
   });
   (async()=>{
     try{
-      const preference=(await chrome.storage.local.get(prefKey))[prefKey];
-      const theme=["system","light","dark"].includes(preference?.theme)?preference.theme:"system";
+      const pref=(await chrome.storage.local.get(prefKey))[prefKey];
+      const theme=["system","light","dark"].includes(pref?.theme)?pref.theme:"system";
       ui.theme.value=theme;document.documentElement.dataset.theme=theme;
       const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
       if(!tab?.id||!/^https?:\/\//i.test(tab.url||""))return unavailable("Unsupported page");
-      const url=new URL(tab.url);tabId=tab.id;key="vanish.site."+url.hostname.toLowerCase();
-      // An exact origin needs no site-wide extension content script permission at installation.
-      hostPattern=url.protocol+"//"+url.hostname+"/*";
-      scriptId="vanish_"+[...url.origin].map(character=>character.charCodeAt(0).toString(16).padStart(2,"0")).join("");
-      ui.domain.textContent=url.hostname;
-      const permitted=await chrome.permissions.contains({origins:[hostPattern]});
-      ui.access.textContent=permitted?"✓ Permission granted for this origin.":"No site access yet. Selecting requests permission.";
-      ui.forget.disabled=!permitted;
-      state=normalise((await chrome.storage.local.get(key))[key]);draw();
-    }catch(error){unavailable("Page access unavailable");announce(error?.message||"Permission denied");}
+      const url=new URL(tab.url);
+      tabId=tab.id;origin=url.origin;hostname=url.hostname.toLowerCase();
+      ui.domain.textContent=origin;await refresh();
+    }catch(error){unavailable("Unavailable");announce(error.message||"Browser permission error");}
   })();
 })();

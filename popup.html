@@ -24,21 +24,21 @@
     <section class="site" aria-label="Active website">
       <div class="site-row"><span class="eyebrow">01 / TARGET</span><span id="count" class="count">0 rules</span></div>
       <strong id="domain" class="domain">Checking active tab…</strong>
-      <p>Rules are scoped to this hostname, not every website.</p>
+      <p>Rules are scoped to this exact origin. Forget hostname revokes all its granted origins.</p>
       <p id="access" class="access" role="status">Checking site permission…</p>
     </section>
     <button id="pick" class="primary" type="button"><span>⌖</span> SELECT &amp; VANISH <span>↗</span></button>
-    <p class="hint">Hover to preview. Click to hide. <kbd>Shift</kbd> selects precisely; <kbd>Esc</kbd> cancels.</p>
+    <p class="hint">Hover to preview. Click to hide (structural selectors only). <kbd>Shift</kbd> selects precisely; <kbd>Esc</kbd> cancels.</p>
     <div class="rule-header">
       <div><span class="eyebrow">02 / SAVED RULES</span><h2>On this site</h2></div>
       <label class="switch-label"><input id="enabled" type="checkbox" checked><span>Enabled</span></label>
     </div>
     <div id="rules" class="rules" aria-live="polite"></div>
-    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore all</button><button id="forget" type="button" class="danger">Forget site</button></div>
+    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore origin</button><button id="forget" type="button" class="danger">Forget hostname</button><button id="forget-all" type="button" class="danger">Purge all sites</button></div>
     <p class="status" id="status" role="status"></p>
     <footer>
       <span class="privacy">● LOCAL STORAGE / NO EXTENSION EGRESS</span>
-      <p>Nothing sent to ADMINE. This does not stop the website's own traffic.</p>
+      <p>No text from selected pages is retained. Normal website and browser network traffic continues.</p>
     </footer>
   </main>
   <script src="popup.js"></script>

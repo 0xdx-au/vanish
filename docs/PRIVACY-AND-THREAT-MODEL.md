@@ -1,42 +1,54 @@
-# Vanish — data flow, privacy and threat model
+# VANISH v1.3 — privacy, boundaries and threat model
 
-## Execution path
-1. At installation Vanish has **no default website content-script access**. Clicking the popup picker requests a Chrome optional host permission for the **current HTTP(S) origin** only. If approved, Chrome registers a persistent isolated-world content script for that origin; other sites remain untouched. The content script reads the current hostname to compute a local storage key.
-2. Chrome extension-local storage returns saved rules for that hostname and an enabled flag. These are never synced by the extension. The **Forget site** command removes the local hostname rules, unregisters the current origin's dynamic script and asks Chrome to revoke that origin's permission. Already loaded tabs require a reload to unload the injected script.
-3. If rules are active, the content script installs a private CSS stylesheet and a *local* MutationObserver to reapply rules to recreated DOM elements. The observer is disconnected when no active rule remains.
-4. User gesture in the popup starts an isolated-world picker. While active, the script examines visible element ancestry, position, classes, role and text (for a short label). Click creates CSS selectors for the chosen element and optional backdrop.
-5. Chrome stores selectors, label and timestamp locally. The page applies CSS to hide matching elements. A best-effort scroll repair applies only to overlay selections and preserves/reinstates modified inline style properties on restore.
-6. All site data remains in the browser profile under `chrome.storage.local`; there is no app server, account, backend, remote diagnostics or telemetry.
+**Status:** inspectable source and automated tests, not independently certified. Visual page cleanup only; not an authentication, subscription or server-side access bypass.
 
-## Trust boundaries
-- **Extension boundary** — the popup/content scripts are isolated-world JavaScript, but are still privileged to view and alter webpage DOM; the selected element's short label is local browser data.
-- **Webpage boundary** — the site can observe visible DOM changes and can dynamically rebuild overlays, disable content delivery, or enforce server-side access controls; Vanish cannot override those.
-- **Browser boundary** — browser extensions, Chrome Sync settings, profile backups, security products, browsing history and native browser services have independent behaviour. Vanish cannot assert they transmit no data.
-- **Local user boundary** — someone with access to the Chrome profile can inspect saved rules. Do not treat storage as encryption.
+## 1 / Minimal data model
 
-## Egress inventory
-| Component | Extension-initiated network requests | Note |
+A user-activated permission prompt grants Chrome access to an HTTP(S) **hostname + scheme**. Chrome host match patterns **cannot differentiate ports**, so permission applies across those ports; the trusted broker independently authorises the exact **origin**, including port, before allowing a rule read/write. It uses the key `vanish.rules.v3.` + `encodeURIComponent(origin)`.
+
+Stored rule schema: `{enabled:boolean,rules:[{id,selectors,unlockScroll}]}`, with a maximum of 24 rules and three selectors per rule. **No captured page text, arbitrary element label, form value, timestamp, URL path, query string or page contents are persisted.** Structural tag paths and nth-of-type values still reveal some page structure, and the locally retained origin list reveals site origins. Storage is not encrypted.
+
+The content script cannot directly access extension storage. The `background.js` Manifest V3 service worker calls `chrome.storage.local.setAccessLevel({accessLevel:"TRUSTED_CONTEXTS"})`, validates sender identity and frame, checks origin-specific approval plus Chrome host permission, and permits only approved rule operations. The service worker contains no network API.
+
+On first v1.3 startup/upgrade, a fail-closed migration **deletes all legacy v1.2 hostname rules and their page-derived text labels**, drops existing dynamic Vanish scripts and host permissions, and requires user re-approval. Old already-injected tabs must be reloaded: Chrome cannot forcibly remove an extension script from an existing page.
+
+## 2 / Interaction and revocation
+
+- Select & Vanish: ask permission on the current site. Approval is deliberately stored for this exact origin, while Chrome's host grant is scheme/hostname-scoped.
+- Content script: only starts the picker when the broker verifies origin approval, builds a bounded structural-only selector, and sends it to the broker. It does not inspect or store the popup's text.
+- Local observer: only while active rules exist; a 24-rule cap, bounded match count, 240ms debounce, execution budget and mutation-storm fail-safe pause prevent unattended CPU thrash. On failure, restore the page and disconnect.
+- Forget hostname: delete all origin-specific rules for **every port and scheme** on the hostname, notify already-running content scripts to stop, unregister matching dynamic scripts, request removal of Chrome host permissions, then verify the removal.
+- Purge all: delete all Vanish site rules, approvals and preferences, unregister every Vanish dynamic content script and revoke all optional HTTP(S) host grants.
+- Incognito: `"incognito":"not_allowed"` in manifest. No Incognito permission can be enabled.
+
+A hostile page can recreate the overlay, replace DOM nodes, spoof the appearance of the picker, or observe changes that Vanish makes. A non-cooperative website can prevent scrolling or refuse to deliver content. The user should treat an extension with DOM access as sensitive code.
+
+## 3 / Network and egress truth
+
+| Component | Deliberate outbound requests | Qualification |
 |---|---|---|
-| popup JS/CSS | None | Packaged assets only; extension-page CSP denies `connect-src` |
-| content script | None | Packaged script, injected only on approved origin, DOM operations, local storage API |
-| service worker | N/A | No background/service worker registered |
-| remote assets or analytics | None | No CDN, fonts, images, tracking pixels or SDKs |
-| the visited webpage / Chrome | Uncontrolled by Vanish | Normal browser/site connections continue and may react to DOM changes |
+| Popup | None | Assets local, extension-page `connect-src 'none'` |
+| Content script | None | DOM, messaging to browser internal extension broker only |
+| Service worker | None | Storage and Chrome permissions APIs only; no fetch/network use |
+| CDN, fonts, analytics, telemetry | None | No remote assets or developer endpoint |
+| Chrome / host website / other extensions | Outside Vanish control | They can continue to make ordinary requests |
 
-This is **zero application-level outbound data transmission**, not a guarantee of zero device network egress. "No monitoring" means no developer/operator tracking or off-device surveillance. Local DOM observation for applying a saved user rule is disclosed, limited in purpose and disabled when no enabled rules exist.
+**"No extension-initiated application-level egress" is not "zero network traffic from the device."** DOM modifications may be observable by the website, which can transmit its own telemetry. The browser may communicate with vendors for updates, diagnostics and other reasons. Test coverage captures fixture traffic and extension behaviour in Chromium; it cannot see all operating-system or browser service traffic. No source review proves an absolute future guarantee.
 
-## STRIDE-style scenarios
-| Risk | Boundaries and mitigation | Residual |
-|---|---|---|
-| Spoofed UI | Isolated shadow UI, explicit user gesture, no remote content | Pages can imitate the branding |
-| Stored-selector manipulation | Bounded selectors, grammar validation, local-only storage | Local malware / compromised extension profile |
-| Accidental content hiding | Highlight preview, reversible rules, pause/restore controls | Wrong click still changes page |
-| Sensitive metadata | Rules scoped to hostname; short local label; no sync or egress | Profile backups or local administrators |
-| DOM thrash / denial of service | 100-rule cap, debounced observer, bounded selectors | Complex pages can still degrade |
-| Misleading access claim | Explicit visual-only limitation | Website may immediately recreate gates |
-| Vendor monetisation | Source-available terms reserve commercial exploitation | Technical ability to fork cannot be eliminated |
+## 4 / CI supply chain
 
-## Verifiable evidence and limitations
-Review the exact published source: `manifest.json`, `content.js`, `popup.js`, `popup.css` and packaged icons. Run the included Node test suite, then perform manual Chrome testing on a synthetic page (not sensitive third-party content). For egress, inspect extension context Network panels, not the entire tab, and compare with a baseline without the extension. Repeat after reload, selection, restore and tab navigation. Static source audits and captured traffic establish evidence only for the tested version and environment, not absolute future claims.
+The media-generation workflow no longer receives a write-capable GitHub token and cannot commit or push generated binaries to `main`. Its build and extension ZIP are uploaded as **untrusted reviewable CI artifacts** for manual release approval. The security workflow runs source policy assertions and a real, unpacked MV3 Chromium fixture. Both jobs use read-only repository tokens and pin their GitHub Actions to commit SHAs. The package install dependencies are version-pinned, though external package mirrors and runners remain trust dependencies.
 
-**Privacy default:** No website access before approval, no auto-enabled website-specific prewritten rules, no cloud backup, no lists downloaded, no telemetry and no third-party integrations.
+The 10-second promotional video still uses a mocked Chrome messaging layer to demonstrate the DOM picker. It is not presented as equivalent to the separate full installed-extension test.
+
+## 5 / Tests and limitations
+
+`node --test tests/security-contract.test.mjs` checks manifest, privacy invariants and CI policy.
+
+`python tests/browser-acceptance.py` uses real Chrome extension APIs in a persistent Chromium profile and locally hosted fixture pages to check install, Incognito denial, unapproved-origin rejection, genuine host permission granting, origin isolation across ports, actual picking, safe persistence, abusive CSS rejection, DOM mutation fail-safe, complete revocation and an HTTP(S) request observer.
+
+Chrome’s own permission prompt automation and the browser’s headless implementation are test-environment dependencies. A test failure is an **inconclusive release gate**, not proof the mechanism is safe. A pass is evidence for the tested browser/version only.
+
+**Trusted boundaries:** installed extension package, browser extension APIs, Chrome profile, GitHub release process. **Untrusted:** websites, page DOM, page script, scraped text, remotely downloaded binaries, arbitrary copied release files.
+
+**Release discipline:** review source, install from a verified build, inspect extension permissions, and test network behaviour independently before claiming operational security.

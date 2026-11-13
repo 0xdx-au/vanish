@@ -4,11 +4,14 @@
   if (globalThis.__admineVanishReady) return;
   globalThis.__admineVanishReady = true;
 
-  const KEY = "vanish.site." + location.hostname.toLowerCase();
+  const ORIGIN = location.origin;
+  const KEY = "vanish.rules.v3." + encodeURIComponent(ORIGIN);
   const STYLE_ID = "__admine_vanish_rules";
-  const MAX_RULES = 100;
-  const MAX_SELECTOR = 650;
-  const ACCENT = "#EA87C3";
+  const MAX_RULES = 24;
+  const MAX_SELECTOR = 480;
+  const MAX_MATCHES = 8;
+  const MAX_SCAN_MS = 16;
+  const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em"]);
   const HINT = /modal|dialog|pop.?up|overlay|interstitial|lightbox|adblock|ad.block|backdrop|scrim|dimmer|paywall|consent/i;
   let site = { enabled: true, rules: [] };
   let loaded = false;
@@ -16,7 +19,11 @@
   let toast = null;
   let toastTimeout = null;
   let observer = null;
+  let ruleStyle = null;
   let scanTimeout = null;
+  let stopped = false;
+  let safetyPaused = false;
+  let churn = 0, churnSince = 0;
   let scrollRepair = new Map();
   const hiddenInline = new Map();
 
@@ -28,15 +35,18 @@
   };
 
   function validSelector(selector) {
-    if (typeof selector !== "string" || !selector || selector.length > MAX_SELECTOR || /[{}\r\n\0]/.test(selector)) return false;
+    // Deliberately structural: no IDs, classes, attributes, strings, selectors with url().
+    const grammar = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
+    if (typeof selector !== "string" || selector.length > MAX_SELECTOR || !grammar.test(selector) ||
+        !selector.split(/\s*>\s*/).slice(1).every(segment=>SAFE_TAGS.has(segment.split(":")[0]))) return false;
     try { document.querySelector(selector); return true; } catch { return false; }
   }
   function normalise(value) {
     const rules = Array.isArray(value?.rules) ? value.rules.filter(rule =>
-      rule && typeof rule.id === "string" && rule.id.length <= 80 &&
-      Array.isArray(rule.selectors) && rule.selectors.length > 0 && rule.selectors.length <= 4 &&
+      rule && typeof rule.id === "string" && /^r_[a-f0-9-]{12,40}$/.test(rule.id) &&
+      Array.isArray(rule.selectors) && rule.selectors.length > 0 && rule.selectors.length <= 3 &&
       rule.selectors.every(validSelector)
-    ).slice(-MAX_RULES) : [];
+    ).slice(-MAX_RULES).map(({id,selectors,unlockScroll})=>({id,selectors,unlockScroll:unlockScroll===true})) : [];
     return { enabled: value?.enabled !== false, rules };
   }
   function selectors() {
@@ -52,13 +62,13 @@
 
   function styleNode() {
     if (!document.documentElement) return null;
-    let node = document.getElementById(STYLE_ID);
-    if (!node) {
-      node = element("style");
-      node.id = STYLE_ID;
-      (document.head || document.documentElement).appendChild(node);
+    if (!ruleStyle || !ruleStyle.isConnected) {
+      // Never adopt a page-owned node with the same ID.
+      ruleStyle = element("style");
+      ruleStyle.id = STYLE_ID;
+      (document.head || document.documentElement).appendChild(ruleStyle);
     }
-    return node;
+    return ruleStyle;
   }
   function restoreScroll() {
     for (const [node, properties] of scrollRepair) {
@@ -97,11 +107,12 @@
 
   function scan() {
     scanTimeout = null;
-    if (!loaded || !document.documentElement) return;
+    if (!loaded || stopped || safetyPaused || !document.documentElement) return;
+    const started = performance.now();
     const sel = selectors();
     // A site can replace its <head>; restore the packaged rule sheet without reading or transmitting content.
     const rulesCSS = sel.map(value => value + " { display: none !important; visibility: hidden !important; pointer-events: none !important; }").join("\n");
-    const liveStyle = styleNode();
+    const liveStyle = sel.length ? styleNode() : ruleStyle;
     if (liveStyle && liveStyle.textContent !== rulesCSS) liveStyle.textContent = rulesCSS;
     if (!sel.length) {
       cancelInlineOverrides();
@@ -114,7 +125,10 @@
       if (!site.enabled) break;
       for (const selector of rule.selectors) {
         try {
-          for (const node of document.querySelectorAll(selector)) {
+          const found = document.querySelectorAll(selector);
+          if (found.length > MAX_MATCHES) { pauseForSafety("Rule matched too many elements"); return; }
+          for (const node of found) {
+            if (performance.now() - started > MAX_SCAN_MS) { pauseForSafety("Rule processing exceeded budget"); return; }
             if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) continue;
             matched.add(node);
             if (rule.unlockScroll) overlayMatch = true;
@@ -136,18 +150,35 @@
   }
 
   function scheduleScan() {
-    if (scanTimeout !== null) return;
-    scanTimeout = setTimeout(scan, 130);
+    if (stopped || safetyPaused || scanTimeout !== null) return;
+    scanTimeout = setTimeout(scan, 240);
+  }
+  function pauseForSafety(reason) {
+    safetyPaused = true;
+    observer?.disconnect();
+    observer = null;
+    if (scanTimeout !== null) clearTimeout(scanTimeout);
+    scanTimeout = null;
+    cancelInlineOverrides();
+    restoreScroll();
+    ruleStyle?.remove(); ruleStyle = null;
+    show("Vanish paused", reason + ". Reload the page to retry.");
   }
   function watch() {
-    const active = loaded && selectors().length > 0 && document.documentElement;
+    const active = loaded && !stopped && !safetyPaused && selectors().length > 0 && document.documentElement;
     if (!active) {
       observer?.disconnect();
       observer = null;
       return;
     }
     if (!observer) {
-      observer = new MutationObserver(scheduleScan);
+      observer = new MutationObserver(records => {
+        const now = performance.now();
+        if (!churnSince || now - churnSince > 3000) { churnSince = now; churn = 0; }
+        churn += records.length;
+        if (churn > 1000) { pauseForSafety("Excessive page mutation activity"); return; }
+        scheduleScan();
+      });
       observer.observe(document.documentElement, {
         subtree: true, childList: true, attributes: true,
         attributeFilter: ["class", "style", "open", "aria-hidden"]
@@ -159,12 +190,18 @@
       document.addEventListener("DOMContentLoaded", apply, { once: true });
       return;
     }
-    const list = selectors();
+    const list = stopped || safetyPaused ? [] : selectors();
     const css = list.map(s => s + " { display: none !important; visibility: hidden !important; pointer-events: none !important; }").join("\n");
-    const style = styleNode();
-    if (style && style.textContent !== css) style.textContent = css;
+    if (list.length) {
+      const style = styleNode();
+      if (style && style.textContent !== css) style.textContent = css;
+    } else {
+      ruleStyle?.remove(); ruleStyle = null;
+      cancelInlineOverrides();
+      restoreScroll();
+    }
     watch();
-    scheduleScan();
+    if (list.length) scan(); // Initial cleanup must restore scroll before reporting success.
   }
   function checkStyle() {
     if (loaded && site.enabled && site.rules.length) {
@@ -173,60 +210,29 @@
     }
   }
 
-  function safeToken(token) {
-    return Boolean(token && token.length < 48 && !/^\d/.test(token) &&
-      !/^[a-f0-9]{12,}$/i.test(token) && !/\d{6}/.test(token));
-  }
   function unique(selector) {
     if (!validSelector(selector)) return false;
     try { return document.querySelectorAll(selector).length === 1; } catch { return false; }
   }
   function selectorFor(node) {
-    if (!(node instanceof Element) || !node.isConnected) return null;
-    if (node === document.body || node === document.documentElement) return null;
-    const tag = node.localName;
-    if (node.id && safeToken(node.id)) {
-      const selector = "#" + CSS.escape(node.id);
-      if (unique(selector)) return selector;
+    if (!(node instanceof Element) || !node.isConnected ||
+        node === document.body || node === document.documentElement) return null;
+    if (node.closest("input,textarea,select,[contenteditable=true]")) return null;
+    const parts = [];
+    let current = node;
+    while (current && current.localName !== "html" && parts.length < 19) {
+      const tag = current.localName;
+      if (!SAFE_TAGS.has(tag)) return null;
+      const siblings = current.parentElement ?
+        [...current.parentElement.children].filter(x => x.localName === tag) : [];
+      const index = siblings.indexOf(current) + 1;
+      const segment = tag + (siblings.length > 1 ? ":nth-of-type(" + index + ")" : "");
+      parts.unshift(segment);
+      current = current.parentElement;
     }
-    for (const name of ["data-testid", "data-test", "data-qa"]) {
-      const value = node.getAttribute(name);
-      if (value && value.length <= 60 && !/\s/.test(value)) {
-        const selector = tag + "[" + name + "=" + JSON.stringify(value) + "]";
-        if (unique(selector)) return selector;
-      }
-    }
-    const classes = [...node.classList].filter(safeToken).slice(0, 3);
-    for (const name of classes) {
-      const selector = tag + "." + CSS.escape(name);
-      if (unique(selector)) return selector;
-    }
-    if (classes.length > 1) {
-      const selector = tag + "." + classes.slice(0, 2).map(CSS.escape).join(".");
-      if (unique(selector)) return selector;
-    }
-    if (node.matches("[role=dialog]") && unique(tag + "[role=dialog]")) return tag + "[role=dialog]";
-    const path = [];
-    for (let current = node; current && current.localName !== "html" && path.length < 13; current = current.parentElement) {
-      const siblings = current.parentElement ? [...current.parentElement.children].filter(x => x.localName === current.localName) : [];
-      let segment = current.localName;
-      if (current.id && safeToken(current.id)) segment = "#" + CSS.escape(current.id);
-      else {
-        const names = [...current.classList].filter(safeToken);
-        if (names.length) segment += "." + CSS.escape(names[0]);
-        if (siblings.length > 1) segment += ":nth-of-type(" + (siblings.indexOf(current) + 1) + ")";
-      }
-      path.unshift(segment);
-      const test = path.join(" > ");
-      if (unique(test)) return test;
-    }
-    const full = [];
-    for (let current = node; current && current.localName !== "html"; current = current.parentElement) {
-      const siblings = current.parentElement ? [...current.parentElement.children].filter(x => x.localName === current.localName) : [];
-      full.unshift(current.localName + (siblings.length > 1 ? ":nth-of-type(" + (siblings.indexOf(current) + 1) + ")" : ""));
-    }
-    const candidate = "html > " + full.join(" > ");
-    return candidate.length < MAX_SELECTOR && unique(candidate) ? candidate : null;
+    if (!current || current.localName !== "html" || parts[0] !== "body") return null;
+    const candidate = "html > " + parts.join(" > ");
+    return validSelector(candidate) && unique(candidate) ? candidate : null;
   }
   function rectUsable(rect) {
     return rect.width >= 25 && rect.height >= 20 && rect.bottom > 0 && rect.right > 0 &&
@@ -258,7 +264,7 @@
     if (!["fixed", "absolute"].includes(style.position) || style.display === "none") return false;
     const name = node.id + " " + (typeof node.className === "string" ? node.className : "");
     return /backdrop|scrim|dimmer|underlay|shade|mask/i.test(name) ||
-      ((node.textContent || "").trim().length < 22 &&
+      (node.childElementCount === 0 &&
       !["transparent", "rgba(0, 0, 0, 0)"].includes(style.backgroundColor));
   }
   function backdrops(primary) {
@@ -283,13 +289,6 @@
     return node.matches("dialog,[role=dialog],[aria-modal=true]") || HINT.test(name) ||
       (["fixed","absolute"].includes(style.position) && rect.width > 160 && rect.height > 100);
   }
-  function label(node) {
-    const value = node.getAttribute("aria-label") || node.getAttribute("title") ||
-      node.innerText || node.textContent || node.localName || "Selected element";
-    const safe = value.replace(/\s+/g, " ").trim();
-    return safe.slice(0, 64) || "Selected element";
-  }
-
   function makeUI(id) {
     const host = element("div");
     host.id = id;
@@ -329,10 +328,10 @@
       undo.addEventListener("click", async event => {
         event.stopPropagation();
         try {
-          const stored = await chrome.storage.local.get(KEY);
-          const next = normalise(stored[KEY]);
-          next.rules = next.rules.filter(rule => rule.id !== undoId);
-          await chrome.storage.local.set({[KEY]:next});
+          const result = await chrome.runtime.sendMessage({type:"CONTENT_REMOVE",id:undoId});
+          if (!result?.ok) throw new Error(result?.error || "Undo denied");
+          site = normalise(result.state);
+          apply();
           show("Restored", "Selection removed from local rules.");
         } catch { show("Restore failed", "Open Vanish and remove the rule manually."); }
       });
@@ -385,21 +384,19 @@
   }
   async function save(target, exact) {
     const primary = selectorFor(target);
-    if (!primary) return show("Not saved", "No stable selector. Try Shift-clicking the exact element.");
+    if (!primary) return show("Not saved", "No stable, non-identifying selector exists.");
     const sel = [primary, ...(exact ? [] : backdrops(target))].filter((value,index,all)=>all.indexOf(value)===index);
     try {
-      const stored = await chrome.storage.local.get(KEY);
-      const next = normalise(stored[KEY]);
-      if (next.rules.some(rule=>rule.selectors[0]===primary)) return show("Already hidden","An existing rule matches this element.");
-      const id = "r_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
-      next.enabled=true;
-      next.rules.push({id, selectors:sel, label:label(target), unlockScroll:!exact&&isOverlay(target), addedAt:Date.now()});
-      next.rules=next.rules.slice(-MAX_RULES);
-      await chrome.storage.local.set({[KEY]:next});
-      site=next;loaded=true;apply();
-      show("Element vanished", "Rule saved locally for "+location.hostname+".",id);
-    } catch {
-      show("Could not save", "Local storage unavailable. Nothing was persisted.");
+      const result = await chrome.runtime.sendMessage({
+        type: "CONTENT_SAVE", rule: { selectors: sel, unlockScroll: !exact && isOverlay(target) }
+      });
+      if (!result?.ok) throw new Error(result?.error || "Rule refused");
+      site = normalise(result.state);
+      loaded = true;
+      apply();
+      show("Element vanished", "Rule stored locally for this origin.", result.id);
+    } catch (error) {
+      show("Not saved", error?.message || "Local storage unavailable.");
     }
   }
   function pickClick(event) {
@@ -434,18 +431,45 @@
     return {ok:true};
   }
 
+  async function loadRules() {
+    const result = await chrome.runtime.sendMessage({type:"CONTENT_READ"});
+    site = result?.ok ? normalise(result.state) : {enabled:false,rules:[]};
+    loaded = true;
+    apply();
+    return result?.ok === true;
+  }
+  function shutdown() {
+    stopped = true;
+    stopPicker();
+    endToast();
+    observer?.disconnect();observer=null;
+    if (scanTimeout !== null) clearTimeout(scanTimeout);
+    scanTimeout=null;
+    cancelInlineOverrides();
+    restoreScroll();
+    ruleStyle?.remove(); ruleStyle = null;
+    site={enabled:false,rules:[]};
+  }
   chrome.runtime.onMessage.addListener((message,_sender,respond)=>{
     if (!message || typeof message!=="object") return;
-    if (message.type==="START_PICK") respond(startPicker());
-    else if (message.type==="CANCEL_PICK") {stopPicker();respond({ok:true});}
-    else if (message.type==="STATUS") respond({ok:true, enabled:site.enabled, count:site.rules.length});
+    if (message.type === "CONTENT_SHUTDOWN_ALL" ||
+      (message.type === "CONTENT_SHUTDOWN" && message.hostname === location.hostname)) {
+      shutdown();respond({ok:true});return;
+    }
+    if (message.type === "RULES_REFRESH") {
+      if (stopped) {respond({ok:false,error:"Reload page after revocation"});return;}
+      safetyPaused=false;void loadRules().then(ok=>respond({ok})).catch(e=>respond({ok:false,error:e.message}));
+      return true;
+    }
+    if (message.type === "START_PICK") {
+      if (stopped) {respond({ok:false,error:"Reload page to reactivate"});return;}
+      void loadRules().then(ok=>respond(ok?startPicker():{ok:false,error:"Origin not approved"}))
+        .catch(e=>respond({ok:false,error:e.message}));
+      return true;
+    }
+    if (message.type === "CANCEL_PICK") {stopPicker();respond({ok:true});}
+    else if (message.type === "STATUS") respond({ok:true,enabled:site.enabled,count:site.rules.length,
+      paused:safetyPaused,stopped});
   });
-  chrome.storage.onChanged.addListener((changes,area)=>{
-    if (area!=="local" || !Object.hasOwn(changes,KEY)) return;
-    site=normalise(changes[KEY].newValue);loaded=true;apply();
-  });
-  chrome.storage.local.get(KEY).then(result=>{
-    site=normalise(result[KEY]);loaded=true;apply();
-  }).catch(()=>{loaded=true;apply();});
-  if (!document.documentElement) document.addEventListener("DOMContentLoaded",checkStyle,{once:true});
+  void loadRules().catch(()=>{site={enabled:false,rules:[]};loaded=true;apply();});
 })();

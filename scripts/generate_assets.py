@@ -84,10 +84,26 @@ h1{font-size:53px;line-height:1.05;letter-spacing:-2px;margin:20px 0}
 <div class="cards"><div><strong>01 / Select</strong><em>Identify a page element.</em></div><div><strong>02 / Vanish</strong><em>Hide it from view.</em></div><div><strong>03 / Continue</strong><em>Restore it any time.</em></div></div></main>
 <div id="screen-layer"><div id="scrim"></div><div id="user-interrupt" role="dialog" aria-modal="true" aria-label="Promotional popup"><span class="key">EXAMPLE INTERRUPTION / DEMO</span><h2>You're missing out.</h2><p>This interruption obscures the page. Select it with Vanish to remove it from your view.</p><button>ALLOW INTERRUPTIONS</button><div class="notice">Synthetic local page. No third-party websites.</div></div></div></body></html>"""
 SHIM="""(() => {
-const listeners=[],data={};
-window.chrome={
-storage:{local:{async get(key){return {[key]:data[key]};},async set(o){const c={};for(const [k,v] of Object.entries(o)){c[k]={oldValue:data[k],newValue:v};data[k]=v;}for(const fn of listeners)fn(c,'local');}},onChanged:{addListener(fn){listeners.push(fn);}}},
-runtime:{onMessage:{addListener(fn){window.__vanishMessage=fn;}}}};
+const data={site:{enabled:true,rules:[]}};
+window.chrome={runtime:{
+  onMessage:{addListener(fn){window.__vanishMessage=fn;}},
+  async sendMessage(message){
+    if(message.type==='CONTENT_READ') return {ok:true,state:data.site};
+    if(message.type==='CONTENT_SAVE'){
+      const rule=message.rule;
+      if(!rule || !Array.isArray(rule.selectors) || !rule.selectors.every(s=>/^html\\s*>\\s*body\\s*>/.test(s)))
+        return {ok:false,error:'Invalid selector'};
+      const id='r_00000000-0000-4000-8000-000000000001';
+      data.site.rules.push({id,selectors:rule.selectors,unlockScroll:rule.unlockScroll===true});
+      return {ok:true,state:data.site,id};
+    }
+    if(message.type==='CONTENT_REMOVE'){
+      data.site.rules=data.site.rules.filter(x=>x.id!==message.id);
+      return {ok:true,state:data.site};
+    }
+    return {ok:false,error:'Unsupported test message'};
+  }
+}};
 window.__vanishData=()=>data;
 })();"""
 with tempfile.TemporaryDirectory(prefix="vanish-test-recording-") as tmp:
@@ -113,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix="vanish-test-recording-") as tmp:
            scroll:getComputedStyle(document.body).overflowY,
            saved:Object.values(window.__vanishData()).flatMap(x=>x?.rules||[]).length
         })""")
-        print("CHROME DOM PROOF:", json.dumps(proof))
+        print("CHROME DOM PROOF:", json.dumps(proof),flush=True)
         if proof["modal"]!="none" or proof["backdrop"]!="none" or proof["saved"]<1 or proof["scroll"]=="hidden":
             raise RuntimeError("Unsuccessful browser picker/backdrop/scroll verification")
         page.screenshot(path=str(SHOTS/"03-vanished.png"))
