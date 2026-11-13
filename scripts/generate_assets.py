@@ -93,7 +93,7 @@ window.chrome={runtime:{
       const rule=message.rule;
       if(!rule || !Array.isArray(rule.selectors) || !rule.selectors.every(s=>/^html\\s*>\\s*body\\s*>/.test(s)))
         return {ok:false,error:'Invalid selector'};
-      const id='r_'+crypto.randomUUID();
+      const id='r_00000000-0000-4000-8000-000000000001';
       data.site.rules.push({id,selectors:rule.selectors,unlockScroll:rule.unlockScroll===true});
       return {ok:true,state:data.site,id};
     }
@@ -129,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix="vanish-test-recording-") as tmp:
            scroll:getComputedStyle(document.body).overflowY,
            saved:Object.values(window.__vanishData()).flatMap(x=>x?.rules||[]).length
         })""")
-        print("CHROME DOM PROOF:", json.dumps(proof))
+        print("CHROME DOM PROOF:", json.dumps(proof),flush=True)
         if proof["modal"]!="none" or proof["backdrop"]!="none" or proof["saved"]<1 or proof["scroll"]=="hidden":
             raise RuntimeError("Unsuccessful browser picker/backdrop/scroll verification")
         page.screenshot(path=str(SHOTS/"03-vanished.png"))
