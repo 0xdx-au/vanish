@@ -15,11 +15,17 @@ test('Manifest V3, exact permissions, Chrome minimum and no background agent', (
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.minimum_chrome_version, '116');
 });
-test('Site entry point and page limitations are explicit', () => {
-  assert.deepEqual(manifest.content_scripts[0].matches, ['http://*/*', 'https://*/*']);
-  assert.equal(manifest.content_scripts[0].all_frames, false);
-  assert.equal(manifest.content_scripts[0].run_at, 'document_start');
-  assert.equal(manifest.content_scripts[0].js[0], 'content.js');
+test('Site access requires a user gesture and optional, per-origin grant', () => {
+  assert.equal(manifest.content_scripts, undefined);
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.match(popup, /chrome\.permissions\.request\(\{origins:\[hostPattern\]\}\)/);
+  assert.match(popup, /chrome\.permissions\.contains\(/);
+  assert.match(popup, /chrome\.permissions\.remove\(/);
+  assert.match(popup, /chrome\.scripting\.registerContentScripts\(/);
+  assert.match(popup, /chrome\.scripting\.unregisterContentScripts\(/);
+  assert.match(popup, /persistAcrossSessions:true/);
+  assert.match(popup, /await ensureHostAccess\(\)/);
+  assert.doesNotMatch(popup, /chrome\.storage\.sync/);
 });
 test('Extension pages have connect-src none and packaged resources', () => {
   assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
@@ -39,7 +45,7 @@ test('No extension-initiated network APIs or remote assets', () => {
   }
 });
 test('User-facing rule, undo, pause and theme controls have handlers', () => {
-  for(const id of ['pick','enabled','undo','restore','rules','domain','theme','status']) assert.match(html, new RegExp('id="'+id+'"'));
+  for(const id of ['pick','enabled','undo','restore','forget','access','rules','domain','theme','status']) assert.match(html, new RegExp('id="'+id+'"'));
   for(const name of ['START_PICK','undo','restore','enabled','theme']) assert.match(popup, new RegExp(name));
 });
 test('Selector cap, isolated UI and reversible scroll handling are present', () => {
