@@ -2,10 +2,15 @@ name: Generate Chrome Web Store assets
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'security/**']
     paths:
       - scripts/generate_assets.py
       - .github/workflows/store-assets.yml
+      - content.js
+      - background.js
+      - manifest.json
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
