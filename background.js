@@ -100,7 +100,7 @@ function senderOrigin(sender) {
   } catch { return null; }
 }
 function fromPopup(sender) {
-  return sender.id === chrome.runtime.id && !sender.tab &&
+  return sender.id === chrome.runtime.id &&
     typeof sender.url === "string" &&
     sender.url === chrome.runtime.getURL("popup.html");
 }
