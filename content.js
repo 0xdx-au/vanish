@@ -19,6 +19,7 @@
   let toast = null;
   let toastTimeout = null;
   let observer = null;
+  let ruleStyle = null;
   let scanTimeout = null;
   let stopped = false;
   let safetyPaused = false;
@@ -61,13 +62,13 @@
 
   function styleNode() {
     if (!document.documentElement) return null;
-    let node = document.getElementById(STYLE_ID);
-    if (!node) {
-      node = element("style");
-      node.id = STYLE_ID;
-      (document.head || document.documentElement).appendChild(node);
+    if (!ruleStyle || !ruleStyle.isConnected) {
+      // Never adopt a page-owned node with the same ID.
+      ruleStyle = element("style");
+      ruleStyle.id = STYLE_ID;
+      (document.head || document.documentElement).appendChild(ruleStyle);
     }
-    return node;
+    return ruleStyle;
   }
   function restoreScroll() {
     for (const [node, properties] of scrollRepair) {
@@ -111,7 +112,7 @@
     const sel = selectors();
     // A site can replace its <head>; restore the packaged rule sheet without reading or transmitting content.
     const rulesCSS = sel.map(value => value + " { display: none !important; visibility: hidden !important; pointer-events: none !important; }").join("\n");
-    const liveStyle = sel.length ? styleNode() : document.getElementById(STYLE_ID);
+    const liveStyle = sel.length ? styleNode() : ruleStyle;
     if (liveStyle && liveStyle.textContent !== rulesCSS) liveStyle.textContent = rulesCSS;
     if (!sel.length) {
       cancelInlineOverrides();
@@ -160,7 +161,7 @@
     scanTimeout = null;
     cancelInlineOverrides();
     restoreScroll();
-    document.getElementById(STYLE_ID)?.remove();
+    ruleStyle?.remove(); ruleStyle = null;
     show("Vanish paused", reason + ". Reload the page to retry.");
   }
   function watch() {
@@ -195,7 +196,7 @@
       const style = styleNode();
       if (style && style.textContent !== css) style.textContent = css;
     } else {
-      document.getElementById(STYLE_ID)?.remove();
+      ruleStyle?.remove(); ruleStyle = null;
       cancelInlineOverrides();
       restoreScroll();
     }
@@ -446,7 +447,7 @@
     scanTimeout=null;
     cancelInlineOverrides();
     restoreScroll();
-    document.getElementById(STYLE_ID)?.remove();
+    ruleStyle?.remove(); ruleStyle = null;
     site={enabled:false,rules:[]};
   }
   chrome.runtime.onMessage.addListener((message,_sender,respond)=>{
