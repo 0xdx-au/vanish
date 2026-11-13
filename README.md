@@ -1,20 +1,12 @@
 <div align="center">
 
-```text
- __     __    _    _   _ ___ ____  _   _
- \ \   / /   / \  | \ | |_ _/ ___|| | | |
-  \ \ / /   / _ \ |  \| || |\___ \| |_| |
-   \ V /   / ___ \| |\  || | ___) |  _  |
-    \_/   /_/   \_\_| \_|___|____/|_| |_|
-
-                 by ADMINE
-```
+![Vanish by ADMINE — select an interruption, make it disappear](store-assets/marquee-promo-1400x560.png)
 
 **Make the interruption disappear. Keep the page.**
 
-A lightweight Chrome extension that lets you select and hide unwanted page elements.
+A lightweight Chrome extension for selecting and hiding unwanted page elements.
 
-[Install](#install) · [How it works](#how-it-works) · [Controls](#controls) · [Privacy](#privacy) · [Licence](#licence)
+[**Try the interactive ADMINE demo**](https://admine.au/projects/vanish/#v-demo) · [Install](#install) · [Screenshots](#see-vanish-in-action) · [Privacy](#privacy) · [Licence](#licence)
 
 </div>
 
@@ -39,22 +31,20 @@ Some sites put banners, floating boxes, newsletter prompts and overlays in front
 | **Restore** | Undo one selection, restore an entire site, pause rules, or clear everything. |
 | **Choose your theme** | Light, dark or match your system. |
 
-### A quick look
+## See Vanish in action
 
-```text
-  BEFORE                                         AFTER
+Screenshots of the selection workflow from the project's **controlled local Chromium demonstration**. No real news site, user data, or private browsing information is involved. Want to click through it instead? [Open the interactive demo on ADMINE](https://admine.au/projects/vanish/#v-demo).
 
-  +---------------------------+                 +---------------------------+
-  | Article                   |                 | Article                   |
-  |  ......................   |                 |  ......................   |
-  |  +---------------------+  |    VANISH       |  More readable content.   |
-  |  |   POPUP / BANNER    |  |  ---------->    |                           |
-  |  |   [ dismiss? ]      |  |                 |  Continue scrolling...    |
-  |  +---------------------+  |                 |                           |
-  +---------------------------+                 +---------------------------+
+| 01 / Before — page obscured | 02 / Select — preview the target |
+| :--- | :--- |
+| [![Before: a local test page obscured by an interruption](store-assets/screenshots/01-before.png)](store-assets/screenshots/01-before.png) | [![Selecting the interruption with the Vanish picker](store-assets/screenshots/02-target-selected.png)](store-assets/screenshots/02-target-selected.png) |
 
-                   Selected, hidden, reversible.
-```
+| 03 / After — interruption hidden | 04 / Local rules — illustrative interface |
+| :--- | :--- |
+| [![After: the interruption is hidden and page content is visible](store-assets/screenshots/03-vanished.png)](store-assets/screenshots/03-vanished.png) | [![Illustrative composite showing locally stored rules](store-assets/screenshots/04-local-rule.png)](store-assets/screenshots/04-local-rule.png) |
+
+The fourth image is an **illustrative composite**, not a screenshot of a live extension popup. The first three are captured from the browser-based demonstration. The [ADMINE project page](https://admine.au/projects/vanish/) includes the interactive version, which you can reset and replay.
+
 
 ## Install
 

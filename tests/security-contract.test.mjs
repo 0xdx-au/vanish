@@ -93,3 +93,23 @@ test("popup messaging avoids technical OPSEC inventory", () => {
   assert.doesNotMatch(html,/NO EXTENSION EGRESS|structural selectors|trusted context/i);
   assert.doesNotMatch(popup,/\bOPSEC\b|Rule processing exceeded budget/i);
 });
+
+test("README visual walkthrough uses genuine repository screenshots, not ASCII placeholders", () => {
+  const readme = read("README.md");
+  const assets = [
+    "store-assets/marquee-promo-1400x560.png",
+    "store-assets/screenshots/01-before.png",
+    "store-assets/screenshots/02-target-selected.png",
+    "store-assets/screenshots/03-vanished.png",
+    "store-assets/screenshots/04-local-rule.png"
+  ];
+  for (const path of assets) {
+    assert.ok(readme.includes(path), "README missing image: " + path);
+    const bytes = readFileSync(new URL("../" + path, import.meta.url));
+    assert.deepEqual(Array.from(bytes.subarray(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10], path + ": PNG signature");
+    assert.ok(bytes.length > 10_000, path + ": unexpected empty image");
+  }
+  assert.ok(readme.includes("https://admine.au/projects/vanish/#v-demo"), "Interactive demo link missing");
+  assert.doesNotMatch(readme, /```text/);
+  assert.match(readme, /illustrative composite/i);
+});
