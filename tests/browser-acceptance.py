@@ -87,12 +87,15 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         popup.evaluate("""pattern => {
           const button=document.createElement('button');button.id='test-permission';
           button.addEventListener('click', async()=> {
-            window.permissionResult=await chrome.permissions.request({origins:[pattern]});
+            try {window.permissionResult=await chrome.permissions.request({origins:[pattern]});}
+            catch(e){window.permissionResultError=e.message;}
+            document.body.dataset.permissionFinished='1';
           });
           document.body.append(button);
         }""","http://127.0.0.1/*")
         popup.locator("#test-permission").click()
-        popup.wait_for_function("window.permissionResult !== undefined",timeout=12000)
+        popup.locator('body[data-permission-finished="1"]').wait_for(timeout=12000)
+        if popup.evaluate("window.permissionResultError"): raise RuntimeError(popup.evaluate("window.permissionResultError"))
         granted=popup.evaluate("window.permissionResult")
         check(granted is True,"Real Chrome optional host permission granted from click")
         response=broker(popup,"ADMIN_APPROVE",{"origin":origin})
