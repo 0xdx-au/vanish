@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vanish — ADMINE</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header class="head">
+      <img class="brand" src="icons/vanish.svg" alt="">
+      <div class="brand-title">
+        <span class="eyebrow">ADMINE / LOCAL INSTRUMENT</span>
+        <h1>VANISH<span>.</span></h1>
+        <p>Less noise. More signal.</p>
+      </div>
+      <label class="theme-label" for="theme">APPEARANCE
+        <select id="theme" title="Appearance preference">
+          <option value="system">Auto</option><option value="dark">Dark</option><option value="light">Light</option>
+        </select>
+      </label>
+    </header>
+    <section class="site" aria-label="Active website">
+      <div class="site-row"><span class="eyebrow">01 / TARGET</span><span id="count" class="count">0 rules</span></div>
+      <strong id="domain" class="domain">Checking active tab…</strong>
+      <p>Rules are scoped to this hostname, not every website.</p>
+    </section>
+    <button id="pick" class="primary" type="button"><span>⌖</span> SELECT &amp; VANISH <span>↗</span></button>
+    <p class="hint">Hover to preview. Click to hide. <kbd>Shift</kbd> selects precisely; <kbd>Esc</kbd> cancels.</p>
+    <div class="rule-header">
+      <div><span class="eyebrow">02 / SAVED RULES</span><h2>On this site</h2></div>
+      <label class="switch-label"><input id="enabled" type="checkbox" checked><span>Enabled</span></label>
+    </div>
+    <div id="rules" class="rules" aria-live="polite"></div>
+    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore all</button></div>
+    <p class="status" id="status" role="status"></p>
+    <footer>
+      <span class="privacy">● LOCAL STORAGE / NO EXTENSION EGRESS</span>
+      <p>Nothing sent to ADMINE. This does not stop the website's own traffic.</p>
+    </footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
