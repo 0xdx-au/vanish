@@ -25,6 +25,7 @@
       <div class="site-row"><span class="eyebrow">01 / TARGET</span><span id="count" class="count">0 rules</span></div>
       <strong id="domain" class="domain">Checking active tab…</strong>
       <p>Rules are scoped to this hostname, not every website.</p>
+      <p id="access" class="access" role="status">Checking site permission…</p>
     </section>
     <button id="pick" class="primary" type="button"><span>⌖</span> SELECT &amp; VANISH <span>↗</span></button>
     <p class="hint">Hover to preview. Click to hide. <kbd>Shift</kbd> selects precisely; <kbd>Esc</kbd> cancels.</p>
@@ -33,7 +34,7 @@
       <label class="switch-label"><input id="enabled" type="checkbox" checked><span>Enabled</span></label>
     </div>
     <div id="rules" class="rules" aria-live="polite"></div>
-    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore all</button></div>
+    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore all</button><button id="forget" type="button" class="danger">Forget site</button></div>
     <p class="status" id="status" role="status"></p>
     <footer>
       <span class="privacy">● LOCAL STORAGE / NO EXTENSION EGRESS</span>
