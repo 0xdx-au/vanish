@@ -36,7 +36,10 @@ jobs:
           # Playwright 1.57 does not yet identify ubuntu26.04-x64.
           # Download the compatible ubuntu24.04 Linux Chromium+FFmpeg binaries.
           python -m playwright install chromium ffmpeg
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
           command -v ffmpeg
+          command -v ffprobe
       - name: Render and actually exercise the packaged Vanish picker
         run: python scripts/generate_assets.py
       - name: Assert image formats, dimensions and video duration
