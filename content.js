@@ -11,6 +11,7 @@
   const MAX_SELECTOR = 480;
   const MAX_MATCHES = 8;
   const MAX_SCAN_MS = 16;
+  const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em"]);
   const HINT = /modal|dialog|pop.?up|overlay|interstitial|lightbox|adblock|ad.block|backdrop|scrim|dimmer|paywall|consent/i;
   let site = { enabled: true, rules: [] };
   let loaded = false;
@@ -35,7 +36,8 @@
   function validSelector(selector) {
     // Deliberately structural: no IDs, classes, attributes, strings, selectors with url().
     const grammar = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
-    if (typeof selector !== "string" || selector.length > MAX_SELECTOR || !grammar.test(selector)) return false;
+    if (typeof selector !== "string" || selector.length > MAX_SELECTOR || !grammar.test(selector) ||
+        !selector.split(/\s*>\s*/).slice(1).every(segment=>SAFE_TAGS.has(segment.split(":")[0]))) return false;
     try { document.querySelector(selector); return true; } catch { return false; }
   }
   function normalise(value) {
@@ -219,7 +221,7 @@
     let current = node;
     while (current && current.localName !== "html" && parts.length < 19) {
       const tag = current.localName;
-      if (!/^[a-z][a-z0-9-]*$/.test(tag)) return null;
+      if (!SAFE_TAGS.has(tag)) return null;
       const siblings = current.parentElement ?
         [...current.parentElement.children].filter(x => x.localName === tag) : [];
       const index = siblings.indexOf(current) + 1;
