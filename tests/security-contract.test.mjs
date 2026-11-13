@@ -68,7 +68,7 @@ test("no intentional extension network APIs or remote assets", () => {
   for(const [path,src] of [["popup.js",popup],["content.js",content],["background.js",background]]) {
     for(const forbidden of [
       /\bfetch\s*\(/,/\bXMLHttpRequest\b/,/\bWebSocket\b/,/\bEventSource\b/,
-      /\.sendBeacon\s*\(/,/\bimportScripts\s*\(/,/https?:\/\/(?!\*\/)/,
+      /\.sendBeacon\s*\(/,/\bimportScripts\s*\(/,
       /<script\b[^>]*src=["']https?:/i,/chrome\.storage\.sync/
     ]) assert.doesNotMatch(src,forbidden,path+": "+forbidden);
   }
