@@ -198,7 +198,7 @@
       restoreScroll();
     }
     watch();
-    if (list.length) scheduleScan();
+    if (list.length) scan(); // Initial cleanup must restore scroll before reporting success.
   }
   function checkStyle() {
     if (loaded && site.enabled && site.rules.length) {
