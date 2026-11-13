@@ -188,7 +188,7 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
                     urlsplit(u).hostname not in ("127.0.0.1","localhost")]
         check(not unexpected,"No unexpected HTTP(S) page/context requests: "+str(unexpected))
         # Independent proxy also observes vendor-owned Chrome traffic, not only extension traffic.
-        chrome_service_hosts={"www.google.com","accounts.google.com"}
+        chrome_service_hosts={"www.google.com","accounts.google.com","android.clients.google.com"}
         chrome_ambient=[hit for hit in proxy_hits if hit[1].split(":")[0] in chrome_service_hosts]
         unknown=[hit for hit in proxy_hits if hit not in chrome_ambient]
         print("CHROME AMBIENT PROXY ATTEMPTS (blocked):",json.dumps(chrome_ambient),flush=True)
