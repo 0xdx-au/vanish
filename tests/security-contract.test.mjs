@@ -113,3 +113,17 @@ test("README visual walkthrough uses genuine repository screenshots, not ASCII p
   assert.doesNotMatch(readme, /```text/);
   assert.match(readme, /illustrative composite/i);
 });
+
+test("Chrome Web Store evidence and privacy URL are linked in publisher instructions", () => {
+  const store = read("store-assets/README.md");
+  const readme = read("README.md");
+  const url = "https://admine.au/vanish-privacy.html";
+  assert.ok(store.includes(url), "Store checklist missing dedicated public privacy URL");
+  assert.ok(readme.includes(url), "README missing dedicated privacy URL");
+  for (const image of ["01-before.png", "02-target-selected.png", "03-vanished.png"]) {
+    assert.ok(store.includes("screenshots/" + image), "Missing store upload asset: " + image);
+  }
+  assert.match(store, /Store listing[^\n]*Screenshots/);
+  assert.match(store, /Privacy[^]*Privacy policy/);
+  assert.match(store, /Save your draft/i);
+});
