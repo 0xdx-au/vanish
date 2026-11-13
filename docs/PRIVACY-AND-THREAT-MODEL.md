@@ -1,6 +1,6 @@
 # VANISH v1.3 — privacy, boundaries and threat model
 
-**Chrome Web Store policy for users:** https://admine.au/vanish-privacy.html
+**Chrome Web Store policy for users:** https://admine.au/vanish-privacy
 
 This document is the technical supplement; the public HTML policy is the address entered into the Chrome Web Store Privacy tab.
 

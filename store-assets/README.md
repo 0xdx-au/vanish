@@ -23,7 +23,7 @@ Google requires at least one screenshot of **1280×800** or **640×400**, full b
 
 Under the extension's **Privacy** tab, enter this complete URL in the **Privacy policy** field:
 
-**https://admine.au/vanish-privacy.html**
+**https://admine.au/vanish-privacy**
 
 The policy is a standalone public HTTPS HTML document specifically describing Vanish's local rule storage, website permissions, data sharing, deletion options, and Chrome Web Store Limited Use compliance. Do **not** use the generic `https://admine.au/privacy/` page, GitHub README, or an image URL for the extension's privacy policy.
 
