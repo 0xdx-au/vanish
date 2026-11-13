@@ -9,6 +9,11 @@ const MAX_RULES = 24;
 const MAX_SELECTORS = 3;
 const MAX_SELECTOR = 480;
 const SELECTOR = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
+const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em"]);
+function safeSelector(value) {
+  return typeof value === "string" && value.length <= MAX_SELECTOR && SELECTOR.test(value) &&
+    value.split(/\s*>\s*/).slice(1).every(segment => SAFE_TAGS.has(segment.split(":")[0]));
+}
 const OPTIONS = { enabled: true, rules: [] };
 
 function originOf(candidate) {
@@ -39,7 +44,7 @@ function validRule(value) {
     /^r_[a-f0-9-]{12,40}$/.test(value.id) &&
     Array.isArray(value.selectors) && value.selectors.length > 0 &&
     value.selectors.length <= MAX_SELECTORS &&
-    value.selectors.every(x => typeof x === "string" && x.length <= MAX_SELECTOR && SELECTOR.test(x)) &&
+    value.selectors.every(safeSelector) &&
     typeof value.unlockScroll === "boolean";
 }
 function stateOf(raw) {
@@ -169,7 +174,7 @@ async function handle(message, sender) {
     if (message.type === "CONTENT_SAVE") {
       const item = message.rule;
       if (!item || !Array.isArray(item.selectors) || item.selectors.length > MAX_SELECTORS ||
-        !item.selectors.every(s => typeof s === "string" && s.length <= MAX_SELECTOR && SELECTOR.test(s))) {
+        !item.selectors.every(safeSelector)) {
         return { ok: false, error: "Unsafe or unstable selector rejected" };
       }
       const state = await readState(contentOrigin);
