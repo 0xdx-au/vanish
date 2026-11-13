@@ -42,6 +42,16 @@ def server():
     t=Thread(target=h.serve_forever,daemon=True);t.start()
     return h,"http://127.0.0.1:"+str(h.server_address[1])
 
+proxy_hits=[]
+class EgressTrap(BaseHTTPRequestHandler):
+    def do_CONNECT(self):
+        proxy_hits.append(("CONNECT",self.path))
+        self.send_response(403);self.end_headers()
+    def do_GET(self):
+        proxy_hits.append(("GET",self.path))
+        self.send_response(403);self.end_headers()
+    def log_message(self,*_): pass
+
 def check(assertion, message):
     if not assertion: raise AssertionError(message)
     print("PASS:",message,flush=True)
@@ -61,10 +71,14 @@ def find_target_tab(popup,origin):
 with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p:
     primary,origin=server()
     secondary,origin2=server()
+    trap=ThreadingHTTPServer(("127.0.0.1",0),EgressTrap)
+    Thread(target=trap.serve_forever,daemon=True).start()
     requests=[]
     try:
         context=p.chromium.launch_persistent_context(
             profile,channel="chromium",headless=os.getenv("VANISH_HEADED") != "1",
+            proxy={"server":"http://127.0.0.1:"+str(trap.server_address[1]),
+                   "bypass":"127.0.0.1,localhost"},
             args=["--disable-extensions-except="+str(ROOT),
                   "--load-extension="+str(ROOT),
                   "--disable-background-networking","--no-first-run"])
@@ -165,8 +179,10 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         unexpected=[u for u in requests if urlsplit(u).scheme in ("http","https") and
                     urlsplit(u).hostname not in ("127.0.0.1","localhost")]
         check(not unexpected,"No unexpected HTTP(S) page/context requests: "+str(unexpected))
+        check(not proxy_hits,"Independent local egress proxy observed no outbound HTTP(S) attempts: "+str(proxy_hits))
         print("ACCEPTANCE: real Chromium installed-extension checks completed",flush=True)
         context.close()
     finally:
         primary.shutdown()
         secondary.shutdown()
+        trap.shutdown()
