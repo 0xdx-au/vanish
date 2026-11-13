@@ -1,4 +1,4 @@
-/* VANISH / ADMINE — network-free extension control. */
+/* VANISH / ADMINE */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -25,23 +25,23 @@
     ui.count.textContent="Unavailable";
     for(const x of [ui.pick,ui.undo,ui.restore,ui.forget,ui.enabled])x.disabled=true;
     ui.access.textContent="Open an ordinary HTTP(S) webpage.";
-    ui.rules.replaceChildren(el("div","empty","No active site."));
+    ui.rules.replaceChildren(el("div","empty","Open a website to get started."));
   }
   function draw() {
-    ui.count.textContent=state.rules.length+" saved";
+    ui.count.textContent=state.rules.length+" hidden";
     ui.enabled.checked=state.enabled;
     ui.enabled.disabled=!approved||!ready;
     ui.forget.disabled=!approved||!ready;
     ui.undo.disabled=ui.restore.disabled=state.rules.length===0||!ready;
     ui.rules.replaceChildren();
     if(!state.rules.length) {
-      ui.rules.append(el("div","empty","Nothing hidden on this origin."));
+      ui.rules.append(el("div","empty","Nothing hidden here yet."));
       return;
     }
     for(let i=state.rules.length-1;i>=0;i--){
       const rule=state.rules[i],row=el("div","rule"),copy=el("div","rule-label");
       const title=el("strong","","Hidden element "+String(i+1).padStart(2,"0"));
-      const detail=el("small","",rule.unlockScroll?"Overlay / scroll repair":"Visual selection");
+      const detail=el("small","",rule.unlockScroll?"Overlay":"Page element");
       copy.append(title,detail);
       const restore=el("button","","Restore");restore.type="button";restore.disabled=!approved;
       restore.setAttribute("aria-label","Restore hidden element "+(i+1));
@@ -54,8 +54,8 @@
     const data=await ask("ADMIN_READ",{origin});
     state=data.state;approved=data.approved;ready=true;
     ui.access.textContent=approved?
-      "✓ Approved origin. Local rules only.":
-      "No approval for this origin. Chrome will ask on selection.";
+      "Ready for this website.":
+      "Site access will be requested when you select.";
     draw();
   }
   async function refreshTab(){
@@ -84,7 +84,7 @@
       const url=new URL(origin);
       // This must be the first await after the click so Chrome retains the user gesture.
       const granted=await chrome.permissions.request({origins:[url.protocol+"//"+url.hostname+"/*"]});
-      if(!granted)throw new Error("Permission declined. No changes were saved.");
+      if(!granted)throw new Error("Permission declined. Nothing changed.");
       await ask("ADMIN_APPROVE",{origin});
       await refresh();
       const result=await deliver({type:"START_PICK"});
@@ -96,7 +96,7 @@
     const last=state.rules.at(-1);
     if(last)void mutate("ADMIN_REMOVE",{id:last.id},"Last selection restored.");
   });
-  ui.restore.addEventListener("click",()=>mutate("ADMIN_CLEAR",{},"Origin rules cleared."));
+  ui.restore.addEventListener("click",()=>mutate("ADMIN_CLEAR",{},"Site restored."));
   ui.enabled.addEventListener("change",()=>mutate("ADMIN_TOGGLE",{enabled:ui.enabled.checked},
     ui.enabled.checked?"Hiding resumed.":"Hiding paused."));
   ui.forget.addEventListener("click",async()=>{
@@ -105,18 +105,18 @@
     try{
       const result=await ask("ADMIN_FORGET_HOST",{hostname});
       state={enabled:true,rules:[]};approved=false;draw();
-      ui.access.textContent="Hostname permissions and local rules revoked.";
-      announce("Revoked "+result.revokedOrigins+" approved origins. Reload open tabs.");
-    }catch(error){announce("Revocation incomplete: "+error.message);ui.forget.disabled=false;}
+      ui.access.textContent="Website access removed.";
+      announce("Website cleared. Reload open tabs to finish.");
+    }catch(error){announce("Couldn't finish clearing the site: "+error.message);ui.forget.disabled=false;}
   });
   ui.forgetAll.addEventListener("click",async()=>{
     ui.forgetAll.disabled=true;
     try{
       await ask("ADMIN_CLEAR_ALL");
       state={enabled:true,rules:[]};approved=false;draw();
-      ui.access.textContent="All sites cleared and permissions revoked.";
-      announce("All sites reset. Reload already-open tabs.");
-    }catch(error){announce("Global reset incomplete: "+error.message);}
+      ui.access.textContent="All website choices cleared.";
+      announce("All sites cleared. Reload open tabs to finish.");
+    }catch(error){announce("Couldn't clear all sites: "+error.message);}
     finally{ui.forgetAll.disabled=false;}
   });
   ui.theme.addEventListener("change",async()=>{
