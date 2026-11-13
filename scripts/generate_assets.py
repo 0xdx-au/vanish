@@ -3,7 +3,7 @@
 No production websites are visited and no private browsing data is read.
 """
 from pathlib import Path
-import io, json, math, subprocess, tempfile, time, zipfile
+import io, json, math, subprocess, tempfile, time, zipfile, shutil
 from PIL import Image, ImageDraw, ImageFont
 import cairosvg
 from playwright.sync_api import sync_playwright
@@ -92,7 +92,7 @@ window.__vanishData=()=>data;
 })();"""
 with tempfile.TemporaryDirectory(prefix="vanish-test-recording-") as tmp:
     with sync_playwright() as pw:
-        browser=pw.chromium.launch(headless=True)
+        browser=pw.chromium.launch(headless=True,executable_path=(shutil.which("google-chrome") or shutil.which("chromium") or None))
         context=browser.new_context(viewport={"width":1280,"height":720},record_video_dir=tmp,record_video_size={"width":1280,"height":720},device_scale_factor=1)
         page=context.new_page()
         page.set_content(PAGE)
