@@ -31,7 +31,12 @@ jobs:
       - name: Install asset tools
         run: |
           python -m pip install --disable-pip-version-check pillow==12.3.0 cairosvg==2.8.2 playwright==1.57.0
-          python -m playwright install ffmpeg
+          # GitHub ubuntu-26.04 runners already include Chrome and FFmpeg.
+          # Playwright 1.57 cannot install its own FFmpeg on Ubuntu 26,
+          # so point its local video recorder to the system binary.
+          command -v ffmpeg
+          mkdir -p "$HOME/.cache/ms-playwright/ffmpeg-1011"
+          ln -sf "$(command -v ffmpeg)" "$HOME/.cache/ms-playwright/ffmpeg-1011/ffmpeg-linux"
           command -v google-chrome || command -v chromium || exit 1
       - name: Render and actually exercise the packaged Vanish picker
         run: python scripts/generate_assets.py
