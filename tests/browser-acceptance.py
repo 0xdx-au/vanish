@@ -77,9 +77,9 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
     try:
         context=p.chromium.launch_persistent_context(
             profile,channel="chromium",headless=os.getenv("VANISH_HEADED") != "1",
-            proxy={"server":"http://127.0.0.1:"+str(trap.server_address[1]),
-                   "bypass":"127.0.0.1,localhost"},
-            args=["--disable-extensions-except="+str(ROOT),
+            args=["--proxy-server=http://127.0.0.1:"+str(trap.server_address[1]),
+                  "--proxy-bypass-list=127.0.0.1;localhost",
+                  "--disable-extensions-except="+str(ROOT),
                   "--load-extension="+str(ROOT),
                   "--disable-background-networking","--no-first-run"])
         context.on("request",lambda req:requests.append(req.url))
