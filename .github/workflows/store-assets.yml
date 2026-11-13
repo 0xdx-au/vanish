@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: vanish-store-assets
@@ -25,7 +25,7 @@ jobs:
       - name: Check out Vanish source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          persist-credentials: true
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -50,7 +50,7 @@ jobs:
           manifest=json.loads(Path('manifest.json').read_text())
           version=manifest['version']
           target=Path('store-assets')/f'Vanish-extension-v{version}.zip'
-          files=['manifest.json','popup.html','popup.css','popup.js','content.js',
+          files=['manifest.json','popup.html','popup.css','popup.js','content.js','background.js',
                  'LICENSE','README.md','SECURITY.md','icons/vanish.svg',
                  'icons/icon16.png','icons/icon48.png','icons/icon96.png','icons/icon128.png']
           with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
@@ -84,14 +84,11 @@ jobs:
           meta=json.loads(subprocess.check_output(['ffprobe','-v','quiet','-show_entries','format=duration','-of','json',str(root/'vanish-working-demo-10s.mp4')]))
           assert abs(float(meta['format']['duration'])-10)<.06
           PY
-      - name: Commit verified assets to the public repository
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add icons/icon96.png icons/icon128.png store-assets/
-          if git diff --staged --quiet; then
-            echo "All generated artifacts are already current."
-          else
-            git commit -m "assets: publish exact-size store artwork and verified 10s demo"
-            git push origin HEAD:main
-          fi
+      - name: Upload untrusted build output for reviewed publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vanish-store-and-extension-${{ github.run_id }}
+          path: |
+            store-assets/
+          if-no-files-found: error
+          retention-days: 30
