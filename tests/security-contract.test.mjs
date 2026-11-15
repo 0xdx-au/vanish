@@ -162,3 +162,25 @@ test("ADMINE popup is compact, accessible and requires confirmation for global r
   assert.match(html, /aria-live="polite"/);
   assert.doesNotMatch(html, /Pink outline|NO EXTENSION EGRESS/i);
 });
+
+test("stable-only 1.4.1 release links terms and privacy without remote executable code", () => {
+  assert.equal(manifest.version, "1.4.1");
+  const terms = "https://admine.au/vanish-terms";
+  const policy = "https://admine.au/vanish-privacy";
+  const readme = read("README.md");
+  assert.ok(html.includes('href="' + terms + '"'));
+  assert.ok(html.includes('href="' + policy + '"'));
+  assert.match(html, /rel="noopener noreferrer"/);
+  assert.ok(readme.includes(terms) && readme.includes(policy));
+  assert.match(read("SECURITY.md"), /Version 1\.4\.1 enforces/);
+  assert.match(read("SECURITY.md"), /Nightly, beta and development snapshots are not published/);
+  assert.match(read(".github/workflows/verify.yml"), /requirements-ci\.txt/);
+  assert.match(read(".github/workflows/store-assets.yml"), /requirements-assets\.txt/);
+  const tooling = read("requirements-ci.txt") + read("requirements-assets.txt");
+  assert.match(tooling, /playwright==1\.65\.2/);
+  assert.match(tooling, /pillow==13\.0\.0/);
+  assert.match(tooling, /CairoSVG==2\.9\.0/);
+  for (const deprecated of ["playwright==1.57.0","pillow==12.3.0","cairosvg==2.8.2"]) {
+    assert.ok(!tooling.includes(deprecated));
+  }
+});
