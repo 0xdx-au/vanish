@@ -36,7 +36,7 @@ test("origin is source of rule key, and background checks sender origin against 
   assert.match(background,/chrome\.permissions\.contains/);
   assert.match(background,/contentOrigin.*isApproved/);
   assert.match(content,/location\.origin/);
-  assert.match(popup,/origin=url\.origin/);
+  assert.match(popup,/origin\s*=\s*url\.origin/);
 });
 test("both host-specific and global revocation shut down scripts and delete rules", () => {
   assert.match(background,/CONTENT_SHUTDOWN_ALL/);
