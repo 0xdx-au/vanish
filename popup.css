@@ -51,7 +51,7 @@ h1 span{color:var(--accent)}
   border:1px solid transparent;border-radius:5px;background:var(--accent);color:var(--accent-on)}
 .primary:hover:not(:disabled){filter:brightness(1.055)}
 .primary:active:not(:disabled){transform:translateY(1px)}
-.target-glyph{display:grid;place-items:center;width:32px;height:32px;border:1px solid currentColor;border-radius:4px;font-size:24px;line-height:1;flex:none}
+.target-glyph{display:grid;place-items:center;width:32px;height:32px;border:1px solid currentColor;border-radius:4px;flex:none}.target-glyph svg{display:block}
 .primary-copy{display:grid;gap:1px;flex:1;font-size:14px;font-weight:750;letter-spacing:-.015em}
 .primary-copy small{font-size:10px;font-weight:450;opacity:.88;letter-spacing:0}
 .arrow{font-size:18px;line-height:1}
