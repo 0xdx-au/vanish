@@ -48,7 +48,7 @@
     draw();
   }
   function draw() {
-    ui.count.textContent = ready ? (state.rules.length + (state.rules.length === 1 ? " hidden" : " hidden")) : "—";
+    ui.count.textContent = ready ? state.rules.length + " hidden" : "—";
     ui.enabled.checked = state.enabled;
     ui.enabled.disabled = !ready || !approved || busy;
     ui.pick.disabled = !ready || !origin || busy;
@@ -111,12 +111,15 @@
     return status;
   }
   async function refreshTab() {
-    if (!approved || !tabId) return;
+    if (!approved || !tabId) return true;
     try {
       await activeVersion();
-      await tabMessage({ type: "RULES_REFRESH" });
+      const applied = await tabMessage({ type: "RULES_REFRESH" });
+      if (!applied?.ok) throw new Error(applied?.error || "Reload the page to apply changes.");
+      return true;
     } catch (error) {
       announce(error.message || "Reload the page to apply changes.", true);
+      return false;
     }
   }
   async function mutate(type, options, message) {
@@ -128,8 +131,7 @@
       ++refreshId;
       state = response.state;
       draw();
-      await refreshTab();
-      if (ui.status.dataset.tone !== "error") announce(message);
+      if (await refreshTab()) announce(message);
     } catch (error) {
       announce("Couldn't update the site: " + error.message, true);
       await refresh().catch(() => {});
