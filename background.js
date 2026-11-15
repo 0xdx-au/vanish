@@ -57,8 +57,14 @@ function normaliseTelemetry(input) {
     days: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)).slice(-TELEMETRY_DAYS) };
 }
 async function telemetrySnapshot() {
-  return telemetrySequence(async () =>
-    normaliseTelemetry((await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY]));
+  return telemetrySequence(async () => {
+    const raw = (await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY];
+    const current = normaliseTelemetry(raw);
+    // Expire old UTC-day buckets when the dashboard is next opened, not just in memory.
+    if (raw !== undefined && JSON.stringify(raw) !== JSON.stringify(current))
+      await chrome.storage.local.set({ [TELEMETRY_KEY]: current });
+    return current;
+  });
 }
 async function recordTelemetry(event) {
   if (!TELEMETRY_EVENT_SET.has(event)) return;
