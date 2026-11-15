@@ -29,7 +29,7 @@
         <p class="eyebrow">01 / COLLECTION CONTROL</p>
         <h2 id="consent-title">Only what you choose to record.</h2>
         <p>Opt-in counters live in this browser profile. No website names, page text, URLs, selectors, browsing history or error messages are saved in telemetry.</p>
-        <p class="fine">No network requests. No account. No remote dashboard. Retained for up to 14 UTC calendar days.</p>
+        <p class="fine">No network requests. No account. No remote dashboard. Rolling 14 UTC-day window; expired days are removed on the next use.</p>
       </div>
       <div class="switch-panel">
         <label class="switch-row" for="recording">
@@ -62,7 +62,12 @@
         <div class="health-row"><span>Mutation backoffs</span><strong id="health-backoff">0</strong></div>
         <div class="health-row"><span>Scan budget yields</span><strong id="health-yields">0</strong></div>
         <div class="health-row"><span>Safety pauses</span><strong id="health-paused">0</strong></div>
-        <p class="fine">Safeguards do not automatically mean a fault: they can indicate a busy or changing website.</p>
+        <p class="health-subheading">SITE &amp; RULE CONTROLS</p>
+        <div class="health-row"><span>Site permissions granted</span><strong id="health-grants">0</strong></div>
+        <div class="health-row"><span>Sites forgotten</span><strong id="health-forgotten">0</strong></div>
+        <div class="health-row"><span>Rule pauses</span><strong id="health-rule-paused">0</strong></div>
+        <div class="health-row"><span>Rule resumes</span><strong id="health-rule-resumed">0</strong></div>
+        <p class="fine">Safeguards do not automatically mean a fault. To prevent excess storage activity, frequent page signals are rate-limited; those figures are indicators, not an exhaustive event log.</p>
       </section>
     </div>
 
