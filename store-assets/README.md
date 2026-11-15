@@ -2,6 +2,12 @@
 
 These images are ready for the Chrome Web Store **Store listing** form. They are not uploaded just because they appear on GitHub or the ADMINE site.
 
+## Legal disclosure and supported release
+
+The official Vanish v1.4.1 extension uses the [PolyForm Noncommercial License 1.0.0](../LICENSE). Link its [terms of use](https://admine.au/vanish-terms) and [privacy policy](https://admine.au/vanish-privacy) in your Chrome Web Store support/website information where supported. A listing must not promise absolute anonymity, zero browser traffic, guaranteed fixes or non-existent commercial rights.
+
+The verified package is built using **stable, reviewed releases only**, and a new package is uploaded only after Chrome installed-extension acceptance passes. No nightly or beta browser automation packages are used.
+
 ## To clear the two publication errors
 
 ### 1. At least one screenshot or video is required
