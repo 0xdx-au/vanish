@@ -3,43 +3,71 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Vanish — ADMINE</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <main>
-    <header class="head">
-      <img class="brand" src="icons/vanish.svg" alt="">
-      <div class="brand-title">
-        <span class="eyebrow">ADMINE / BROWSER TOOL</span>
-        <h1>VANISH<span>.</span></h1>
-        <p>Less noise. More signal.</p>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <img class="brand-mark" src="icons/vanish.svg" alt="">
+        <div>
+          <p class="eyebrow">ADMINE / BROWSER TOOL</p>
+          <h1>Vanish<span>.</span></h1>
+        </div>
       </div>
-      <label class="theme-label" for="theme">APPEARANCE
-        <select id="theme" title="Appearance preference">
-          <option value="system">Auto</option><option value="dark">Dark</option><option value="light">Light</option>
+      <label class="theme-choice" for="theme">
+        <span>THEME</span>
+        <select id="theme" aria-label="Appearance">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
         </select>
       </label>
     </header>
-    <section class="site" aria-label="Active website">
-      <div class="site-row"><span class="eyebrow">01 / TARGET</span><span id="count" class="count">0 rules</span></div>
-      <strong id="domain" class="domain">Checking active tab…</strong>
-      <p>Your choices are saved only for sites you allow.</p>
-      <p id="access" class="access" role="status">Checking site permission…</p>
+
+    <section class="current-site" aria-labelledby="site-heading">
+      <div class="section-line"><span class="eyebrow" id="site-heading">01 / CURRENT SITE</span><span id="count" class="count">—</span></div>
+      <div class="site-name-row">
+        <span class="site-indicator" aria-hidden="true"></span>
+        <strong id="domain" class="domain">Finding your tab…</strong>
+      </div>
+      <p id="access" class="access" role="status">Checking website access</p>
     </section>
-    <button id="pick" class="primary" type="button"><span>⌖</span> SELECT &amp; VANISH <span>↗</span></button>
-    <p class="hint">Hover to preview. Click to hide. <kbd>Shift</kbd> selects precisely; <kbd>Esc</kbd> cancels.</p>
-    <div class="rule-header">
-      <div><span class="eyebrow">02 / YOUR CHOICES</span><h2>Hidden on this site</h2></div>
-      <label class="switch-label"><input id="enabled" type="checkbox" checked><span>Enabled</span></label>
-    </div>
-    <div id="rules" class="rules" aria-live="polite"></div>
-    <div class="actions"><button id="undo" type="button">Undo last</button><button id="restore" type="button" class="danger">Restore site</button><button id="forget" type="button" class="danger">Forget site</button><button id="forget-all" type="button" class="danger">Clear all sites</button></div>
-    <p class="status" id="status" role="status"></p>
-    <footer>
-      <span class="privacy">● YOUR BROWSER. YOUR CHOICE.</span>
-      <p>No account, tracking or page-content uploads.</p>
-    </footer>
+
+    <section class="picker-section" aria-label="Choose page element">
+      <button id="pick" class="primary" type="button">
+        <span class="target-glyph" aria-hidden="true">⌖</span>
+        <span class="primary-copy">Select an element<small>Preview before hiding</small></span>
+        <span class="arrow" aria-hidden="true">↗</span>
+      </button>
+      <p class="help">Point and click to hide. Hold <kbd>Shift</kbd> for precise selection; <kbd>Esc</kbd> to cancel.</p>
+    </section>
+
+    <section class="saved-section" aria-labelledby="saved-heading">
+      <div class="section-line">
+        <div><p class="eyebrow">02 / SAVED CHOICES</p><h2 id="saved-heading">Hidden on this site</h2></div>
+        <label class="toggle" for="enabled"><input id="enabled" type="checkbox" checked><span>On</span></label>
+      </div>
+      <div id="rules" class="rules" aria-live="polite"></div>
+      <div class="quick-actions">
+        <button id="undo" type="button">Undo last</button>
+        <button id="restore" type="button">Restore site</button>
+      </div>
+    </section>
+
+    <details class="site-controls">
+      <summary>Website &amp; privacy controls <span aria-hidden="true">⌄</span></summary>
+      <div class="site-controls-body">
+        <p>Manage website access and saved choices.</p>
+        <button id="forget" type="button">Forget this site</button>
+        <button id="forget-all" class="destructive" type="button">Clear all sites</button>
+      </div>
+    </details>
+
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <footer><span class="footer-mark">ADMINE.</span><span>LESS NOISE. MORE SIGNAL.</span></footer>
   </main>
   <script src="popup.js"></script>
 </body>
