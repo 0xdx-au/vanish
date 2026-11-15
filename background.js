@@ -18,6 +18,99 @@ function safeSelector(value) {
 }
 const OPTIONS = { enabled: true, rules: [] };
 
+/* Opt-in, on-device aggregate telemetry. Never store an origin, selector, URL or error string. */
+const TELEMETRY_KEY = "vanish.telemetry.v1";
+const TELEMETRY_EVENTS = Object.freeze([
+  "picker_started", "picker_cancelled", "picker_failed", "rules_saved",
+  "rule_restored", "site_restored", "page_cleaned", "mutation_backoff",
+  "scan_deferred", "safety_paused", "permission_granted", "site_forgotten",
+  "rules_paused", "rules_resumed"
+]);
+const TELEMETRY_EVENT_SET = new Set(TELEMETRY_EVENTS);
+const TELEMETRY_DAYS = 14;
+const TELEMETRY_MAX_COUNT = 1000000;
+let telemetryQueue = Promise.resolve();
+const recentSignals = new Map();
+function telemetrySequence(job) {
+  const current = telemetryQueue.then(job);
+  telemetryQueue = current.catch(() => {});
+  return current;
+}
+function normaliseTelemetry(input) {
+  const now = Date.now();
+  const today = new Date(now).toISOString().slice(0, 10);
+  const oldest = new Date(now - (TELEMETRY_DAYS - 1) * 86400000).toISOString().slice(0, 10);
+  const byDay = new Map();
+  const rows = Array.isArray(input?.days) ? input.days.slice(-TELEMETRY_DAYS * 2) : [];
+  for (const row of rows) {
+    if (!row || typeof row.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.day) ||
+        row.day < oldest || row.day > today) continue;
+    const counts = {};
+    for (const event of TELEMETRY_EVENTS) {
+      const n = row.counts?.[event];
+      counts[event] = Number.isSafeInteger(n) && n >= 0
+        ? Math.min(n, TELEMETRY_MAX_COUNT) : 0;
+    }
+    byDay.set(row.day, { day: row.day, counts });
+  }
+  return { version: 1, enabled: input?.enabled === true,
+    days: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)).slice(-TELEMETRY_DAYS) };
+}
+async function telemetrySnapshot() {
+  return telemetrySequence(async () =>
+    normaliseTelemetry((await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY]));
+}
+async function recordTelemetry(event) {
+  if (!TELEMETRY_EVENT_SET.has(event)) return;
+  return telemetrySequence(async () => {
+    const value = normaliseTelemetry((await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY]);
+    if (!value.enabled) return;
+    const day = new Date().toISOString().slice(0, 10);
+    let row = value.days.find(item => item.day === day);
+    if (!row) {
+      row = { day, counts: Object.fromEntries(TELEMETRY_EVENTS.map(x => [x, 0])) };
+      value.days.push(row);
+      value.days = value.days.slice(-TELEMETRY_DAYS);
+    }
+    row.counts[event] = Math.min(TELEMETRY_MAX_COUNT, row.counts[event] + 1);
+    await chrome.storage.local.set({ [TELEMETRY_KEY]: value });
+  });
+}
+async function recordSafely(event) {
+  try { await recordTelemetry(event); } catch { /* Telemetry cannot break the extension. */ }
+}
+async function setTelemetry(enabled) {
+  return telemetrySequence(async () => {
+    const model = normaliseTelemetry((await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY]);
+    model.enabled = enabled;
+    await chrome.storage.local.set({ [TELEMETRY_KEY]: model });
+    return model;
+  });
+}
+async function clearTelemetry() {
+  return telemetrySequence(async () => {
+    const model = normaliseTelemetry((await chrome.storage.local.get(TELEMETRY_KEY))[TELEMETRY_KEY]);
+    model.days = [];
+    await chrome.storage.local.set({ [TELEMETRY_KEY]: model });
+    return model;
+  });
+}
+function allowTelemetrySignal(sender, event) {
+  if (!TELEMETRY_EVENT_SET.has(event) ||
+      !["picker_started", "picker_cancelled", "picker_failed", "page_cleaned",
+        "mutation_backoff", "scan_deferred", "safety_paused"].includes(event)) return false;
+  const id = sender.tab?.id;
+  if (!Number.isInteger(id)) return false;
+  const key = id + ":" + event;
+  const now = Date.now();
+  const wait = ["mutation_backoff", "scan_deferred"].includes(event) ? 30000 : 2500;
+  if (now - (recentSignals.get(key) || 0) < wait) return false;
+  if (recentSignals.size > 512) recentSignals.clear();
+  recentSignals.set(key, now);
+  return true;
+}
+
+
 function originOf(candidate) {
   try {
     const u = new URL(candidate);
@@ -36,7 +129,7 @@ function scriptIdFor(pattern) {
 }
 function keyFor(origin) { return RULE_PREFIX + encodeURIComponent(origin); }
 function isVanishKey(key) {
-  return key === APPROVED || key === SCHEMA || key.startsWith(RULE_PREFIX) || key.startsWith("vanish.site.") || key === "vanish.preferences";
+  return key === APPROVED || key === SCHEMA || key.startsWith(RULE_PREFIX) || key.startsWith("vanish.site.") || key === "vanish.preferences" || key === TELEMETRY_KEY;
 }
 function approvedArray(value) {
   return Array.isArray(value) ? [...new Set(value.filter(x => typeof x === "string" && originOf(x) === x))].slice(0, 256) : [];
@@ -111,6 +204,12 @@ function fromPopup(sender) {
     typeof sender.url === "string" &&
     sender.url === chrome.runtime.getURL("popup.html");
 }
+function fromDashboard(sender) {
+  return sender.id === chrome.runtime.id &&
+    typeof sender.url === "string" &&
+    sender.url === chrome.runtime.getURL("dashboard.html");
+}
+
 async function broadcast(message) {
   let tabs = [];
   try { tabs = await chrome.tabs.query({}); } catch { return; }
@@ -153,6 +252,7 @@ async function removeHost(hostname) {
   return { ok: true, revokedOrigins: removed.length, scripts: ids.length };
 }
 async function clearAll() {
+  await telemetryQueue; // Drain aggregate writes before deleting all Vanish data.
   await broadcast({ type: "CONTENT_SHUTDOWN_ALL" });
   const data = await chrome.storage.local.get(null);
   const toRemove = Object.keys(data).filter(k => isVanishKey(k) && k !== SCHEMA);
@@ -170,9 +270,35 @@ async function handle(message, sender) {
   await ready();
   if (!message || typeof message !== "object" || typeof message.type !== "string") return { ok: false, error: "Invalid message" };
   const contentOrigin = senderOrigin(sender);
+  if (message.type.startsWith("TELEMETRY_")) {
+    if (!fromDashboard(sender)) return { ok: false, error: "Dashboard required" };
+    if (message.type === "TELEMETRY_READ") {
+      const [telemetry, all] = await Promise.all([
+        telemetrySnapshot(), chrome.storage.local.get(null)
+      ]);
+      const approved = approvedArray(all[APPROVED]);
+      const savedRules = Object.entries(all).filter(([key]) => key.startsWith(RULE_PREFIX))
+        .reduce((sum, [, value]) => sum + stateOf(value).rules.length, 0);
+      return { ok: true, telemetry, approvedSites: approved.length, savedRules };
+    }
+    if (message.type === "TELEMETRY_SET") {
+      if (typeof message.enabled !== "boolean") return { ok: false, error: "Boolean required" };
+      return { ok: true, telemetry: await setTelemetry(message.enabled) };
+    }
+    if (message.type === "TELEMETRY_CLEAR") {
+      return { ok: true, telemetry: await clearTelemetry() };
+    }
+    return { ok: false, error: "Unknown telemetry request" };
+  }
   if (message.type.startsWith("CONTENT_")) {
     if (!contentOrigin || !(await isApproved(contentOrigin))) return { ok: false, error: "Origin not approved", state: OPTIONS };
     if (message.type === "CONTENT_READ") return { ok: true, state: await readState(contentOrigin) };
+    if (message.type === "CONTENT_SIGNAL") {
+      if (typeof message.event !== "string" || !allowTelemetrySignal(sender, message.event))
+        return { ok: false, error: "Unsupported or throttled signal" };
+      await recordSafely(message.event);
+      return { ok: true };
+    }
     if (message.type === "CONTENT_SAVE") {
       const item = message.rule;
       if (!item || !Array.isArray(item.selectors) || item.selectors.length > MAX_SELECTORS ||
@@ -186,12 +312,15 @@ async function handle(message, sender) {
       state.enabled = true;
       state.rules.push({ id, selectors: [...new Set(item.selectors)], unlockScroll: item.unlockScroll === true });
       await writeState(contentOrigin, state);
+      await recordSafely("rules_saved");
       return { ok: true, state, id };
     }
     if (message.type === "CONTENT_REMOVE") {
       const state = await readState(contentOrigin);
+      const before = state.rules.length;
       state.rules = state.rules.filter(r => r.id !== message.id);
       await writeState(contentOrigin, state);
+      if (state.rules.length < before) await recordSafely("rule_restored");
       return { ok: true, state };
     }
     return { ok: false, error: "Unknown content request" };
@@ -217,11 +346,13 @@ async function handle(message, sender) {
         runAt: "document_start", persistAcrossSessions: true
       }]);
       const approved = await allApproved();
-      if (!approved.includes(origin)) {
+      const grantedNow = !approved.includes(origin);
+      if (grantedNow) {
         if (approved.length >= 256) return { ok: false, error: "Approved-origin limit reached" };
         approved.push(origin);
         await chrome.storage.local.set({ [APPROVED]: approved });
       }
+      if (grantedNow) await recordSafely("permission_granted");
       return { ok: true, approved: true, state: await readState(origin) };
     }
     case "ADMIN_REMOVE":
@@ -229,17 +360,25 @@ async function handle(message, sender) {
     case "ADMIN_CLEAR": {
       if (!origin) return { ok: false, error: "Invalid origin" };
       const state = await readState(origin);
+      const before = state.rules.length, wasEnabled = state.enabled;
       if (message.type === "ADMIN_REMOVE") state.rules = state.rules.filter(r => r.id !== message.id);
       else if (message.type === "ADMIN_TOGGLE") state.enabled = message.enabled === true;
       else state.rules = [];
       await writeState(origin, state);
+      if (message.type === "ADMIN_REMOVE" && state.rules.length < before)
+        await recordSafely("rule_restored");
+      if (message.type === "ADMIN_CLEAR" && before > 0) await recordSafely("site_restored");
+      if (message.type === "ADMIN_TOGGLE" && wasEnabled !== state.enabled)
+        await recordSafely(state.enabled ? "rules_resumed" : "rules_paused");
       return { ok: true, state };
     }
     case "ADMIN_FORGET_HOST": {
       if (typeof message.hostname !== "string" || !/^[a-z0-9.:[\]-]{1,253}$/i.test(message.hostname)) {
         return { ok: false, error: "Invalid hostname" };
       }
-      return removeHost(message.hostname.toLowerCase());
+      const result = await removeHost(message.hostname.toLowerCase());
+      await recordSafely("site_forgotten");
+      return result;
     }
     case "ADMIN_CLEAR_ALL": return clearAll();
     default: return { ok: false, error: "Unknown request" };
