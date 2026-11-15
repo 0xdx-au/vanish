@@ -127,3 +127,38 @@ test("Chrome Web Store evidence and privacy URL are linked in publisher instruct
   assert.match(store, /Privacy[^]*Privacy policy/);
   assert.match(store, /Save your draft/i);
 });
+
+test("Vanish 1.4 selectors use bounded structural paths or fixed, non-identifying dialog roles", () => {
+  const selectors = [
+    'html > body [role="dialog"][aria-modal="true"]',
+    'html > body dialog[open]'
+  ];
+  for (const selector of selectors) {
+    assert.ok(content.includes(selector), "Content missing stable role fallback");
+    assert.ok(background.includes(selector), "Broker missing role whitelist");
+  }
+  assert.match(content, /semanticFor\(target\)/);
+  assert.match(background, /SEMANTIC_SELECTORS\.has\(value\)/);
+  assert.doesNotMatch(content, /node\.innerText|node\.textContent\s*\|\|/);
+});
+test("busy site fallback is temporary, never silently disables saved rules", () => {
+  assert.match(content, /if \(churn > 1000\) \{/);
+  assert.match(content, /cooldown = setTimeout/);
+  assert.match(content, /scheduleScan\(800\)/);
+  assert.doesNotMatch(content, /churn > 1000\)\s*\{\s*pauseForSafety/);
+  assert.match(content, /hiddenInline\.set\(node, snapshot\(node, "display"\)\)/);
+});
+test("ADMINE popup is compact, accessible and requires confirmation for global reset", () => {
+  const styles = read("popup.css");
+  assert.match(styles, /--canvas:#f5f4f0/);
+  assert.match(styles, /--canvas:#101010/);
+  assert.match(styles, /--accent:#a72c66/);
+  assert.match(styles, /--accent:#ff95ca/);
+  assert.match(styles, /width:390px/);
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.match(html, /<details class="site-controls">/);
+  assert.match(popup, /CLIENT_VERSION = "1\.4\.0"/);
+  assert.match(popup, /Confirm clearing every site/);
+  assert.match(html, /aria-live="polite"/);
+  assert.doesNotMatch(html, /Pink outline|NO EXTENSION EGRESS/i);
+});
