@@ -73,7 +73,7 @@
     }
     ui.record.checked = telemetry.enabled;
     ui.recordLabel.textContent = telemetry.enabled ? "Recording on" : "Recording off";
-    ui.collection.textContent = telemetry.enabled ? "Only anonymous aggregate counts · this device" : "No new activity is being recorded";
+    ui.collection.textContent = telemetry.enabled ? "Non-identifying event totals · this device" : "No new activity is being recorded";
     ui.collection.dataset.active = String(telemetry.enabled);
     $("metric-saved").textContent = number(count("rules_saved"));
     $("metric-pages").textContent = number(count("page_cleaned"));
@@ -82,9 +82,11 @@
     for (const [id, event] of [
       ["health-picker", "picker_started"], ["health-cancelled", "picker_cancelled"],
       ["health-failed", "picker_failed"], ["health-backoff", "mutation_backoff"],
-      ["health-yields", "scan_deferred"], ["health-paused", "safety_paused"]
+      ["health-yields", "scan_deferred"], ["health-paused", "safety_paused"],
+      ["health-grants", "permission_granted"], ["health-forgotten", "site_forgotten"],
+      ["health-rule-paused", "rules_paused"], ["health-rule-resumed", "rules_resumed"]
     ]) $(id).textContent = number(count(event));
-    ui.export.disabled = !telemetry.days.length;
+    ui.export.disabled = busy || !telemetry.days.length;
     chart();
   }
   function resetClear() {
