@@ -15,6 +15,12 @@
     --good:#9ab89d;--good-bg:#25332a;
   }
 }
+:root[data-theme=dark]{
+  color-scheme:dark;--bg:#101010;--surface:#191919;--surface-2:#222222;
+  --ink:#e9e7e1;--muted:#aaa69f;--line:#393737;
+  --accent:#ff95ca;--on-accent:#101010;--accent-soft:#32242c;
+  --good:#9ab89d;--good-bg:#25332a;
+}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
