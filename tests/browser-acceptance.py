@@ -216,6 +216,13 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
           return r[0]?.result;
         }""",tab_id)
         check(negative.get("ok") is False,"Malicious CSS selector rejected by worker")
+        bogus_signal=popup.evaluate("""async tab => {
+          const result=await chrome.scripting.executeScript({target:{tabId:tab,frameIds:[0]},
+            func:()=>chrome.runtime.sendMessage({type:"CONTENT_SIGNAL",event:"https://attacker.invalid/track"})});
+          return result[0]?.result;
+        }""",tab_id)
+        check(bogus_signal.get("ok") is False,
+              "Unrecognised telemetry names and URL-shaped payloads are rejected")
 
         # Busy DOMs must back off rather than silently forgetting all rules.
         start=time.monotonic()
@@ -287,6 +294,16 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         check(dashboard.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth"),
               "Local dashboard light theme fits 390px viewport")
         dashboard.screenshot(path=str(ROOT/"tests"/"output"/"vanish-dashboard-light.png"))
+        with dashboard.expect_download(timeout=10000) as download_info:
+            dashboard.locator("#export").click()
+        exported=download_info.value
+        check(exported.suggested_filename=="vanish-local-signal.json",
+              "Export is a local JSON download, not a network upload")
+        data_text=Path(exported.path()).read_text(encoding="utf-8")
+        payload=json.loads(data_text)
+        check(SECRET not in data_text and origin not in data_text and
+              payload.get("retention")=="14 UTC calendar days" and payload.get("days"),
+              "Export includes aggregate days only, with no browsing identifiers")
         # Switch collection off, then perform a real broker operation; aggregates must not change.
         dashboard.locator("#recording").uncheck()
         before_pause=broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]
@@ -304,6 +321,17 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         dashboard.wait_for_function("document.getElementById('metric-saved').textContent==='0'",timeout=9000)
         check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]==[],
               "Clear telemetry erases the aggregate window")
+        # Simulate a stale/corrupt local bucket. Dashboard read must prune it from disk.
+        dashboard.evaluate("""async () => chrome.storage.local.set({
+          "vanish.telemetry.v1": {version:1,enabled:false,
+            days:[{day:"2001-01-01",counts:{rules_saved:42,unknown:"SENSITIVE"}}]}
+        })""")
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]==[],
+              "Expired telemetry days are excluded from the dashboard")
+        persisted=dashboard.evaluate("""async()=>(
+          await chrome.storage.local.get("vanish.telemetry.v1"))["vanish.telemetry.v1"]""")
+        check(persisted["days"]==[],
+              "Expired telemetry is actually removed from local storage at next access")
         check(len(broker(popup,"ADMIN_READ",{"origin":origin})["state"]["rules"])==1,
               "Telemetry reset never removes saved hiding rules")
         dashboard.locator("#recording").check()
