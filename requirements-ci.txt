@@ -1,0 +1,2 @@
+# Verified stable test tooling. Reviewed upgrades only; no nightlies.
+playwright==1.65.2
