@@ -14,7 +14,7 @@ A lightweight Chrome extension for selecting and hiding unwanted page elements.
 
 ## The idea
 
-Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools. Version 1.4.1 brings a cleaner ADMINE interface, clearer privacy and terms links, and more reliable restoration on busy websites.
+Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools. Version 1.5 adds **Local Signal**: an opt-in, on-device dashboard for usage and reliability counters, without any remote telemetry.
 
 **Click Vanish → choose an element → continue browsing.** Vanish remembers your selection for that website. If you change your mind, undo it.
 
@@ -60,7 +60,7 @@ You can also clone the repository and load its root folder directly. The project
 
 ## How it works
 
-**01 / Open Vanish** — On the page you want to tidy, click the extension icon and select **Select & Vanish**.
+**01 / Open Vanish** — On the page you want to tidy, click the extension icon and select **Select an element**.
 
 **02 / Approve the site** — Chrome asks for permission before Vanish works on a new site. Approval is optional; nothing is hidden if you decline.
 
@@ -83,9 +83,23 @@ You can also clone the repository and load its root folder directly. The project
 
 Refreshing an already-open tab may be required after permissions are revoked or when upgrading to a new extension version. Vanish checks whether the open page has an older picker and asks for a reload instead of silently running mismatched code.
 
+## Local Signal / optional telemetry
+
+Open **Vanish → Local signal** to access the extension-owned dashboard. It works even when the current tab is not a supported website. Recording starts **OFF** and must be enabled by you. It is not a remote dashboard or a service run by ADMINE.
+
+The dashboard displays:
+- Elements hidden, pages where saved rules matched, restores and protective backoffs
+- Picker starts, cancellations, failed selections, deferred scans and safety pauses
+- A 14-day UTC activity chart and current counts of approved origins and saved rules
+- Controls to pause collection, clear the local activity record and export aggregate JSON to your own computer
+
+Telemetry contains **only fixed-name event counts grouped by UTC date**. No page text, website names, hosts, URLs, selectors, browsing history, personal identifiers, error strings or individual event timestamps are added to that data. Nothing is uploaded, sent to ADMINE, synced by Vanish or shared with a third party. The chart automatically drops old data after 14 UTC calendar days when telemetry is accessed or updated.
+
+Switching recording off stops new counts but retains prior aggregates until cleared. **Clear telemetry** removes counters without changing saved hiding rules. **Clear all sites** removes all Vanish rules, permissions, preferences **and telemetry**. Telemetry is stored in Chrome extension-local storage, not an encrypted vault; anyone with control of your Chrome profile may access it. Neither this local-only feature nor Vanish makes the browser or visited websites anonymous.
+
 ## Privacy
 
-**Your choices stay on your device.** Vanish does not have an account, analytics service or remote rules server. It doesn't send selected page content to ADMINE, and does not save text copied from the elements you hide.
+**Your choices stay on your device.** Vanish does not have an account, publisher-operated analytics service or remote rules server. Local Signal counters are opt-in, remain in the browser, and are never sent to ADMINE. It doesn't send selected page content to ADMINE, and does not save text copied from the elements you hide.
 
 Rules are stored locally in Chrome and can be removed at any time. Chrome and the websites you visit still make their own network connections; Vanish does not control that traffic.
 
@@ -114,7 +128,7 @@ When Vanish cannot safely identify an element, it should decline the selection r
 
 ## Build quality
 
-The repository includes tests for permissions, local data handling, page-element selection, restoration and browser behaviour. The v1.4 browser suite also tests dialogs moving in the DOM, websites reapplying inline display styles, high mutation activity, repeat selection, popup theme switching and layout overflow. GitHub Actions runs both source checks and real, unpacked Chromium tests before producing a release candidate.
+The repository includes tests for permissions, local data handling, page-element selection, restoration and browser behaviour. The v1.5 browser suite also tests dialogs moving in the DOM, websites reapplying inline display styles, high mutation activity, repeat selection, popup theme switching and layout overflow. GitHub Actions runs both source checks and real, unpacked Chromium tests before producing a release candidate.
 
 [View verification runs](https://github.com/0xdx-au/vanish/actions/workflows/verify.yml) · [Review the source](https://github.com/0xdx-au/vanish)
 
