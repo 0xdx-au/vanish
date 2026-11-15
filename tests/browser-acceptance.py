@@ -158,6 +158,11 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         target.wait_for_timeout(600)
         check(target.evaluate("getComputedStyle(document.querySelector('#modal')).display")=="none",
               "Selected dialog stays hidden after its DOM hierarchy moves")
+        target.evaluate("""()=>{
+          document.querySelector('#modal').style.setProperty('display','block','important')
+        }""")
+        target.wait_for_function("getComputedStyle(document.querySelector('#modal')).display==='none'",timeout=5000)
+        check(True,"Vanish restores hiding after the page overwrites an inline!important style")
 
         # Same hostname, different port: Chrome may grant host access but broker must not.
         second=context.new_page()
