@@ -164,7 +164,7 @@ test("ADMINE popup is compact, accessible and requires confirmation for global r
 });
 
 test("stable-only 1.4.1 release links terms and privacy without remote executable code", () => {
-  assert.equal(manifest.version, "1.4.1");
+  assert.equal(manifest.version, "1.5.0");
   const terms = "https://admine.au/vanish-terms";
   const policy = "https://admine.au/vanish-privacy";
   const readme = read("README.md");
