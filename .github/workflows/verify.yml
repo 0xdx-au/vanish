@@ -48,6 +48,14 @@ jobs:
         env:
           VANISH_HEADED: "1"
         run: xvfb-run -a python tests/browser-acceptance.py
+      - name: Preserve actual Chrome popup screenshots for design review
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vanish-v1.4-popup-visual-qa-${{ github.run_id }}
+          path: tests/output/*.png
+          if-no-files-found: ignore
+          retention-days: 14
 
   package:
     needs: [source, browser-acceptance]
