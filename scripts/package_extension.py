@@ -13,6 +13,7 @@ assert manifest["background"]["service_worker"]=="background.js"
 version=manifest["version"]
 files=[
  "manifest.json","background.js","content.js","popup.js","popup.css","popup.html",
+ "dashboard.html","dashboard.css","dashboard.js",
  "README.md","LICENSE","NOTICE","TRADEMARKS.md","SECURITY.md","docs/PRIVACY-AND-THREAT-MODEL.md",
  "icons/vanish.svg","icons/icon16.png","icons/icon48.png","icons/icon96.png","icons/icon128.png"
 ]
