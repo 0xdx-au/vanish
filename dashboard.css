@@ -75,6 +75,7 @@ h2{font-size:clamp(16px,2.2vw,20px);line-height:1.3;letter-spacing:-.03em;margin
 .chart-bar.empty{background:var(--line);opacity:.7}
 .chart-label{position:absolute;top:100%;margin-top:9px;font:650 9px var(--mono);color:var(--muted)}
 .trend .fine{margin:33px 0 0}
+.health-subheading{font:750 9px var(--mono);letter-spacing:.09em;color:var(--muted);margin:17px 0 3px}
 .health-row{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid var(--line);padding:9px 0;font-size:12px}
 .health-row strong{font:750 13px var(--mono);font-variant-numeric:tabular-nums}
 .health .fine{margin:13px 0 0}
