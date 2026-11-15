@@ -100,6 +100,24 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         popup.goto("chrome-extension://"+extension_id+"/popup.html",wait_until="domcontentloaded")
         check(popup.evaluate("async()=>chrome.extension.isAllowedIncognitoAccess()") is False,
               "Incognito extension permission is prohibited")
+        # The on-device telemetry dashboard runs as a real trusted extension page.
+        dashboard=context.new_page()
+        dashboard.goto("chrome-extension://"+extension_id+"/dashboard.html",wait_until="domcontentloaded")
+        dashboard.wait_for_function("!document.getElementById('recording').disabled",timeout=9000)
+        initial=broker(dashboard,"TELEMETRY_READ")
+        check(initial.get("ok") is True and initial["telemetry"]["enabled"] is False and
+              initial["telemetry"]["days"]==[],
+              "Local telemetry defaults OFF with no saved activity")
+        check(broker(popup,"TELEMETRY_READ").get("ok") is False and
+              broker(popup,"TELEMETRY_SET",{"enabled":True}).get("ok") is False,
+              "Only the exact dashboard extension URL may read or change telemetry")
+        check(dashboard.locator("#recording").is_visible() and
+              dashboard.locator("#chart").is_visible(),
+              "Actual on-device dashboard has consent and daily chart controls")
+        dashboard.locator("#recording").check()
+        dashboard.wait_for_function("document.getElementById('recording-label').textContent.includes('on')")
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["enabled"] is True,
+              "Recording requires a deliberate user opt-in")
         unapproved=broker(popup,"ADMIN_APPROVE",{"origin":origin})
         check(unapproved.get("ok") is False,"Permission gate refuses ungranted origin")
         notallowed=broker(popup,"ADMIN_READ",{"origin":origin})
@@ -127,6 +145,8 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         check(granted is True,"Real Chrome optional host permission granted from click")
         response=broker(popup,"ADMIN_APPROVE",{"origin":origin})
         check(response.get("ok") is True,"Approved origin registered by trusted worker")
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"][-1]["counts"]["permission_granted"]>=1,
+              "New origin grants are counted without storing an origin in telemetry")
         tab_id=find_target_tab(popup,origin)
         target.reload(wait_until="domcontentloaded")
         target.wait_for_timeout(500)
@@ -142,6 +162,16 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
               "Scroll was unlocked")
         saved=broker(popup,"ADMIN_READ",{"origin":origin})
         check(len(saved.get("state",{}).get("rules",[]))>=1,"Full-origin rule persisted via worker")
+        dashboard.wait_for_function("""async() => {
+          const r=await chrome.runtime.sendMessage({type:"TELEMETRY_READ"});
+          return r.telemetry.days.some(x=>x.counts.rules_saved>0);
+        }""",timeout=8000)
+        stats=broker(dashboard,"TELEMETRY_READ")["telemetry"]
+        check(stats["enabled"] is True and stats["days"][-1]["counts"]["rules_saved"]>=1,
+              "Real picker save appears in on-device telemetry")
+        check(origin not in json.dumps(stats) and SECRET not in json.dumps(stats) and
+              "html > body" not in json.dumps(stats),
+              "Telemetry never includes page text, origin, URL or CSS selector")
         raw=popup.evaluate("async()=>chrome.storage.local.get(null)")
         check(SECRET not in json.dumps(raw),"Sensitive selected-page text never persisted")
         check(not any("label" in r for r in saved["state"]["rules"]),"No rule labels persisted")
@@ -171,6 +201,14 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
               "Different port is not an approved origin")
         check(second.evaluate("getComputedStyle(document.querySelector('#modal')).display")!="none",
               "Rules do not transfer between ports")
+        second_id=find_target_tab(popup,origin2)
+        rejected=popup.evaluate("""async tab => {
+          const result=await chrome.scripting.executeScript({target:{tabId:tab,frameIds:[0]},
+            func:()=>chrome.runtime.sendMessage({type:"CONTENT_SIGNAL",event:"picker_failed"})});
+          return result[0]?.result;
+        }""",second_id)
+        check(rejected.get("ok") is False,
+              "Unapproved origin cannot forge or record telemetry signals")
         negative=popup.evaluate("""async tab=> {
           const r=await chrome.scripting.executeScript({target:{tabId:tab,frameIds:[0]},
             func:()=>chrome.runtime.sendMessage({type:"CONTENT_SAVE",
@@ -178,6 +216,13 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
           return r[0]?.result;
         }""",tab_id)
         check(negative.get("ok") is False,"Malicious CSS selector rejected by worker")
+        bogus_signal=popup.evaluate("""async tab => {
+          const result=await chrome.scripting.executeScript({target:{tabId:tab,frameIds:[0]},
+            func:()=>chrome.runtime.sendMessage({type:"CONTENT_SIGNAL",event:"https://attacker.invalid/track"})});
+          return result[0]?.result;
+        }""",tab_id)
+        check(bogus_signal.get("ok") is False,
+              "Unrecognised telemetry names and URL-shaped payloads are rejected")
 
         # Busy DOMs must back off rather than silently forgetting all rules.
         start=time.monotonic()
@@ -189,6 +234,12 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         target.wait_for_timeout(1700)
         check(target.evaluate("getComputedStyle(document.querySelector('#modal')).display")=="none",
               "Mutation-storm backoff keeps selected elements hidden")
+        dashboard.wait_for_function("""async() => {
+          const r=await chrome.runtime.sendMessage({type:"TELEMETRY_READ"});
+          return r.telemetry.days.some(x=>x.counts.mutation_backoff>0);
+        }""",timeout=8000)
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"][-1]["counts"]["mutation_backoff"]>=1,
+              "Mutation-storm safeguard surfaced as an aggregate health counter")
         cleared=broker(popup,"ADMIN_CLEAR",{"origin":origin})
         check(cleared.get("ok") is True,"Restore clears rules without revoking approval")
         popup.evaluate("""async tab=>chrome.tabs.sendMessage(tab,{type:"RULES_REFRESH"},{frameId:0})""",tab_id)
@@ -212,8 +263,13 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         popup.wait_for_function("document.getElementById('domain')?.textContent.includes('127.0.0.1')",timeout=9000)
         check(popup.locator("#rules .rule").count()==1,
               "Actual popup renders the saved rule without mocked Chrome APIs")
-        check(popup.evaluate("document.body.scrollWidth <= 390"),
-              "Popup has no horizontal overflow at its intended viewport width")
+        popup.set_viewport_size({"width":390,"height":650})
+        check(popup.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"),
+              "Popup has no horizontal scrolling with its real viewport scrollbar")
+        check(popup.evaluate("document.querySelector('.app').getBoundingClientRect().right <= document.documentElement.clientWidth + 1"),
+              "Popup controls stay inside the visible content area")
+        check(popup.locator("#dashboard").is_visible(),
+              "Popup always offers local telemetry without visiting a website")
         check(popup.locator('a[href="https://admine.au/vanish-terms"]').is_visible() and
               popup.locator('a[href="https://admine.au/vanish-privacy"]').is_visible(),
               "Terms and privacy are visible in the actual installed popup")
@@ -225,10 +281,62 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         (ROOT/"tests"/"output").mkdir(parents=True,exist_ok=True)
         popup.set_viewport_size({"width":390,"height":650})
         popup.screenshot(path=str(ROOT/"tests"/"output"/"vanish-popup-dark.png"))
+        dashboard.wait_for_function("getComputedStyle(document.body).backgroundColor==='rgb(16, 16, 16)'",timeout=9000)
+        check(dashboard.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth"),
+              "Local dashboard dark theme has no horizontal overflow")
+        dashboard.set_viewport_size({"width":390,"height":780})
+        dashboard.screenshot(path=str(ROOT/"tests"/"output"/"vanish-dashboard-dark.png"))
         popup.locator("#theme").select_option("light")
         check(popup.evaluate("getComputedStyle(document.body).backgroundColor")=="rgb(245, 244, 240)",
               "ADMINE light theme uses site-aligned background tokens")
         popup.screenshot(path=str(ROOT/"tests"/"output"/"vanish-popup-light.png"))
+        dashboard.wait_for_function("getComputedStyle(document.body).backgroundColor==='rgb(245, 244, 240)'",timeout=9000)
+        check(dashboard.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth"),
+              "Local dashboard light theme fits 390px viewport")
+        dashboard.screenshot(path=str(ROOT/"tests"/"output"/"vanish-dashboard-light.png"))
+        with dashboard.expect_download(timeout=10000) as download_info:
+            dashboard.locator("#export").click()
+        exported=download_info.value
+        check(exported.suggested_filename=="vanish-local-signal.json",
+              "Export is a local JSON download, not a network upload")
+        data_text=Path(exported.path()).read_text(encoding="utf-8")
+        payload=json.loads(data_text)
+        check(SECRET not in data_text and origin not in data_text and
+              payload.get("retention")=="14 UTC calendar days" and payload.get("days"),
+              "Export includes aggregate days only, with no browsing identifiers")
+        # Switch collection off, then perform a real broker operation; aggregates must not change.
+        dashboard.locator("#recording").uncheck()
+        before_pause=broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]
+        check(broker(popup,"ADMIN_TOGGLE",{"origin":origin,"enabled":False}).get("ok") is True,
+              "Rule controls continue working while telemetry is off")
+        check(broker(popup,"ADMIN_TOGGLE",{"origin":origin,"enabled":True}).get("ok") is True,
+              "Rules resume normally with telemetry disabled")
+        after_pause=broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]
+        check(before_pause==after_pause,"Opt-out prevents any new counters")
+        # Clearing telemetry must not clear the saved rules or site permissions.
+        dashboard.locator("#clear").click()
+        check(dashboard.locator("#clear").inner_text()=="Confirm clear",
+              "Clearing activity requires a second intentional click")
+        dashboard.locator("#clear").click()
+        dashboard.wait_for_function("document.getElementById('metric-saved').textContent==='0'",timeout=9000)
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]==[],
+              "Clear telemetry erases the aggregate window")
+        # Simulate a stale/corrupt local bucket. Dashboard read must prune it from disk.
+        dashboard.evaluate("""async () => chrome.storage.local.set({
+          "vanish.telemetry.v1": {version:1,enabled:false,
+            days:[{day:"2001-01-01",counts:{rules_saved:42,unknown:"SENSITIVE"}}]}
+        })""")
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["days"]==[],
+              "Expired telemetry days are excluded from the dashboard")
+        persisted=dashboard.evaluate("""async()=>(
+          await chrome.storage.local.get("vanish.telemetry.v1"))["vanish.telemetry.v1"]""")
+        check(persisted["days"]==[],
+              "Expired telemetry is actually removed from local storage at next access")
+        check(len(broker(popup,"ADMIN_READ",{"origin":origin})["state"]["rules"])==1,
+              "Telemetry reset never removes saved hiding rules")
+        dashboard.locator("#recording").check()
+        check(broker(dashboard,"TELEMETRY_READ")["telemetry"]["enabled"] is True,
+              "Recording can be reenabled after an explicit reset")
         check(popup.locator("#forget-all").is_visible() is False,
               "Destructive global action stays behind expandable controls")
         popup.locator(".site-controls summary").click()
@@ -247,6 +355,9 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
               "All origin-specific rules for hostname erased")
         check(broker(popup,"ADMIN_CLEAR_ALL").get("ok") is True,
               "Global purge operates without any site permission")
+        raw=popup.evaluate("async()=>chrome.storage.local.get(null)")
+        check("vanish.telemetry.v1" not in raw,
+              "Global clear deletes the local telemetry setting and every metric")
         unexpected=[u for u in requests if urlsplit(u).scheme in ("http","https") and
                     urlsplit(u).hostname not in ("127.0.0.1","localhost")]
         check(not unexpected,"No unexpected HTTP(S) page/context requests: "+str(unexpected))

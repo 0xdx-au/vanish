@@ -9,7 +9,7 @@
     status: $("status"), theme: $("theme"), site: document.querySelector(".current-site")
   };
   const PREF = "vanish.preferences";
-  const CLIENT_VERSION = "1.4.1";
+  const CLIENT_VERSION = "1.5.0";
   let tabId = null, origin = null, hostname = null;
   let state = { enabled: true, rules: [] };
   let approved = false, ready = false, busy = false, refreshId = 0, confirmAll = false;
@@ -212,6 +212,14 @@
       announce("Couldn't clear all sites: " + error.message, true);
     } finally {
       setBusy(false);
+    }
+  });
+  $("dashboard").addEventListener("click", async () => {
+    try {
+      await chrome.runtime.openOptionsPage();
+      window.close();
+    } catch (error) {
+      announce("Could not open the local dashboard: " + error.message, true);
     }
   });
   ui.theme.addEventListener("change", async () => {

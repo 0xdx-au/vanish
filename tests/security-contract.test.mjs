@@ -157,14 +157,14 @@ test("ADMINE popup is compact, accessible and requires confirmation for global r
   assert.match(styles, /width:390px/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(html, /<details class="site-controls">/);
-  assert.match(popup, /CLIENT_VERSION = "1\.4\.1"/);
+  assert.match(popup, /CLIENT_VERSION = "1\.5\.0"/);
   assert.match(popup, /Confirm clearing every site/);
   assert.match(html, /aria-live="polite"/);
   assert.doesNotMatch(html, /Pink outline|NO EXTENSION EGRESS/i);
 });
 
 test("stable-only 1.4.1 release links terms and privacy without remote executable code", () => {
-  assert.equal(manifest.version, "1.4.1");
+  assert.equal(manifest.version, "1.5.0");
   const terms = "https://admine.au/vanish-terms";
   const policy = "https://admine.au/vanish-privacy";
   const readme = read("README.md");
@@ -172,7 +172,7 @@ test("stable-only 1.4.1 release links terms and privacy without remote executabl
   assert.ok(html.includes('href="' + policy + '"'));
   assert.match(html, /rel="noopener noreferrer"/);
   assert.ok(readme.includes(terms) && readme.includes(policy));
-  assert.match(read("SECURITY.md"), /Version 1\.4\.1 enforces/);
+  assert.match(read("SECURITY.md"), /Version 1\.5\.0 enforces/);
   assert.match(read("SECURITY.md"), /Nightly, beta and development snapshots are not published/);
   assert.match(read(".github/workflows/verify.yml"), /requirements-ci\.txt/);
   assert.match(read(".github/workflows/store-assets.yml"), /requirements-assets\.txt/);
@@ -182,5 +182,46 @@ test("stable-only 1.4.1 release links terms and privacy without remote executabl
   assert.match(tooling, /CairoSVG==2\.9\.0/);
   for (const deprecated of ["playwright==1.57.0","pillow==12.3.0","cairosvg==2.8.2"]) {
     assert.ok(!tooling.includes(deprecated));
+  }
+});
+
+const dashboard = read("dashboard.js");
+const dashboardHtml = read("dashboard.html");
+const dashboardCss = read("dashboard.css");
+test("telemetry has no remote sink and no user/site identifying fields", () => {
+  assert.equal(manifest.options_ui.page, "dashboard.html");
+  assert.equal(manifest.options_ui.open_in_tab, true);
+  assert.match(manifest.content_security_policy.extension_pages, /connect-src 'none'/);
+  assert.match(background, /const TELEMETRY_KEY = "vanish\.telemetry\.v1"/);
+  assert.match(background, /TELEMETRY_DAYS = 14/);
+  assert.match(background, /enabled: input\?\.enabled === true/);
+  assert.match(background, /normaliseTelemetry/);
+  assert.match(background, /telemetrySequence/);
+  assert.match(background, /sender\.url === chrome\.runtime\.getURL\("dashboard\.html"\)/);
+  assert.match(background, /fromDashboard\(sender\)/);
+  assert.match(background, /allowTelemetrySignal\(sender, message\.event\)/);
+  assert.match(background, /recentSignals\.size > 512/);
+  assert.match(background, /TELEMETRY_CLEAR/);
+  assert.match(background, /telemetryQueue; \/\/ Drain aggregate writes/);
+  assert.match(background, /key === TELEMETRY_KEY/);
+  for (const forbidden of [
+    /\bfetch\s*\(/, /\bXMLHttpRequest\b/, /\bWebSocket\b/,
+    /\.sendBeacon\s*\(/, /\bimportScripts\s*\(/, /chrome\.storage\.sync/
+  ]) {
+    assert.doesNotMatch(dashboard, forbidden);
+  }
+  assert.doesNotMatch(dashboard, /location\.href|location\.origin|tab\.url|hostname|selectors|innerHTML|error\.stack/);
+  assert.doesNotMatch(dashboardHtml, /<script[^>]*src=["']https?:|<iframe\b/i);
+  assert.match(dashboardHtml, /id="recording"/);
+  assert.match(dashboardHtml, /id="clear"/);
+  assert.match(dashboardHtml, /id="export"/);
+  assert.match(dashboardHtml, /id="chart"/);
+  assert.match(dashboardCss, /max-width:700px/);
+  assert.match(dashboardCss, /prefers-reduced-motion/);
+  assert.match(html, /id="dashboard"/);
+  assert.match(popup, /chrome\.runtime\.openOptionsPage\(\)/);
+  const bundle = read("scripts/package_extension.py");
+  for (const path of ["dashboard.html","dashboard.js","dashboard.css"]) {
+    assert.ok(bundle.includes('"' + path + '"'));
   }
 });

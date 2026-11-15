@@ -1,16 +1,6 @@
-name: Generate Chrome Web Store assets
+name: Generate optional promotional assets (manual)
 
 on:
-  push:
-    branches: [main, 'security/**']
-    paths:
-      - scripts/generate_assets.py
-      - .github/workflows/store-assets.yml
-      - content.js
-      - background.js
-      - manifest.json
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

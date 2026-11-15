@@ -12,14 +12,16 @@ Public [Vanish terms](https://admine.au/vanish-terms) and [privacy policy](https
 
 ## Security boundaries
 
-Version 1.4.1 enforces:
+Version 1.5.0 enforces:
 - **Incognito prohibited** using a manifest declaration.
 - **No page text persistence:** only validated structural selectors, generic UI labels and exact origin identifiers are stored locally.
 - **Origin approval via trusted worker:** all content-script storage goes through `background.js`, with exact origin checks. Chrome host permission itself cannot isolate ports.
 - **Fail-closed legacy migration:** v1.2 stored rules and permissions are purged on upgrade; open tabs must be reloaded to remove already-injected scripts.
 - **One-click revocation:** Forget hostname removes all matching origin records, scripts and grants; Purge all removes every Vanish site record and grant. Check for errors rather than assuming success.
 - **Performance budget:** busy DOM mutation bursts temporarily back off observer scans while retaining active CSS rules. Expensive scans yield rather than permanently disabling hiding; overbroad selectors can still trigger a fail-closed pause and restore.
-- **No app egress:** no authored network APIs, telemetry or remote assets. Browser/site traffic is not controlled.
+- **Local Signal telemetry:** disabled by default, stored only as 14 days of fixed-name UTC daily aggregate counters. No hostnames, paths, selectors, page text, error messages or event-by-event timestamps are stored. Dashboard-only read/toggle/clear messages require an exact trusted extension URL; content events are approved-origin-only and rate-limited.
+- **Local reset:** the dashboard clears counters independently; the extension's global clear erases the telemetry key along with local rules and approvals.
+- **No app egress:** no authored network APIs, remotely transmitted telemetry or remote assets. Browser/site traffic is not controlled.
 
 ## Release checklist
 
