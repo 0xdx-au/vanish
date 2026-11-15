@@ -7,12 +7,14 @@ const APPROVED = "vanish.approvedOrigins";
 const RULE_PREFIX = "vanish.rules.v3.";
 const MAX_RULES = 24;
 const MAX_SELECTORS = 3;
-const MAX_SELECTOR = 480;
-const SELECTOR = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
-const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em"]);
+const MAX_SELECTOR = 650;
+const SELECTOR = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,25}$/;
+const SEMANTIC_SELECTORS = new Set(['html > body [role="dialog"][aria-modal="true"]', 'html > body dialog[open]']);
+const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em","iframe","video","audio","ins","address","time","output"]);
 function safeSelector(value) {
-  return typeof value === "string" && value.length <= MAX_SELECTOR && SELECTOR.test(value) &&
-    value.split(/\s*>\s*/).slice(1).every(segment => SAFE_TAGS.has(segment.split(":")[0]));
+  return typeof value === "string" && value.length <= MAX_SELECTOR &&
+    (SEMANTIC_SELECTORS.has(value) || (SELECTOR.test(value) &&
+    value.split(/\s*>\s*/).slice(1).every(segment => SAFE_TAGS.has(segment.split(":")[0]))));
 }
 const OPTIONS = { enabled: true, rules: [] };
 

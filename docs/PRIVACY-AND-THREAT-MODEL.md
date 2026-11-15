@@ -20,7 +20,7 @@ On first v1.3 startup/upgrade, a fail-closed migration **deletes all legacy v1.2
 
 - Select & Vanish: ask permission on the current site. Approval is deliberately stored for this exact origin, while Chrome's host grant is scheme/hostname-scoped.
 - Content script: only starts the picker when the broker verifies origin approval, builds a bounded structural-only selector, and sends it to the broker. It does not inspect or store the popup's text.
-- Local observer: only while active rules exist; a 24-rule cap, bounded match count, 240ms debounce, execution budget and mutation-storm fail-safe pause prevent unattended CPU thrash. On failure, restore the page and disconnect.
+- Local observer: only while active rules exist; a 24-rule cap, bounded match count, 240ms debounce and execution budget limit work. Mutation storms temporarily pause observation and retry without dropping rules; overbroad selectors trigger fail-closed restoration.
 - Forget hostname: delete all origin-specific rules for **every port and scheme** on the hostname, notify already-running content scripts to stop, unregister matching dynamic scripts, request removal of Chrome host permissions, then verify the removal.
 - Purge all: delete all Vanish site rules, approvals and preferences, unregister every Vanish dynamic content script and revoke all optional HTTP(S) host grants.
 - Incognito: `"incognito":"not_allowed"` in manifest. No Incognito permission can be enabled.

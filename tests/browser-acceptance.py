@@ -147,6 +147,22 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         check(not any("label" in r for r in saved["state"]["rules"]),"No rule labels persisted")
         check(all(r["selectors"][0].startswith("html > body > ") for r in saved["state"]["rules"]),
               "Persisted CSS is structural only")
+        check('html > body [role="dialog"][aria-modal="true"]' in saved["state"]["rules"][0]["selectors"],
+              "Stable semantic role fallback saved without page text")
+        target.evaluate("""()=>{
+          const modal=document.getElementById('modal');
+          const wrapper=document.createElement('article');
+          document.body.insertBefore(wrapper,document.body.firstChild);
+          wrapper.append(modal);
+        }""")
+        target.wait_for_timeout(600)
+        check(target.evaluate("getComputedStyle(document.querySelector('#modal')).display")=="none",
+              "Selected dialog stays hidden after its DOM hierarchy moves")
+        target.evaluate("""()=>{
+          document.querySelector('#modal').style.setProperty('display','block','important')
+        }""")
+        target.wait_for_function("getComputedStyle(document.querySelector('#modal')).display==='none'",timeout=5000)
+        check(True,"Vanish restores hiding after the page overwrites an inline!important style")
 
         # Same hostname, different port: Chrome may grant host access but broker must not.
         second=context.new_page()
@@ -163,14 +179,56 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         }""",tab_id)
         check(negative.get("ok") is False,"Malicious CSS selector rejected by worker")
 
-        # Hostile DOM mutation storm: enforce fail-safe instead of ongoing rescans.
+        # Busy DOMs must back off rather than silently forgetting all rules.
+        start=time.monotonic()
         target.evaluate("""()=>{
           const node=document.getElementById('storm');
           for(let i=0;i<1400;i++)node.setAttribute('class','noise'+i);
         }""")
-        target.wait_for_timeout(800)
-        check(target.evaluate("getComputedStyle(document.querySelector('#modal')).display")!="none",
-              "Mutation-storm fail-safe restores page rather than thrashing")
+        check(time.monotonic()-start < 5.0,"Mutation storm does not lock up browser input")
+        target.wait_for_timeout(1700)
+        check(target.evaluate("getComputedStyle(document.querySelector('#modal')).display")=="none",
+              "Mutation-storm backoff keeps selected elements hidden")
+        cleared=broker(popup,"ADMIN_CLEAR",{"origin":origin})
+        check(cleared.get("ok") is True,"Restore clears rules without revoking approval")
+        popup.evaluate("""async tab=>chrome.tabs.sendMessage(tab,{type:"RULES_REFRESH"},{frameId:0})""",tab_id)
+        target.wait_for_function("getComputedStyle(document.querySelector('#modal')).display!=='none'",timeout=8000)
+        check(target.evaluate("getComputedStyle(document.body).overflowY")=="hidden",
+              "Restoring rules also restores original scroll lock")
+
+        target.reload(wait_until="domcontentloaded")
+        target.wait_for_timeout(500)
+        response=popup.evaluate("""async tab=>chrome.tabs.sendMessage(tab,{type:"START_PICK"},{frameId:0})""",tab_id)
+        check(response.get("ok") is True,"Picker can be reopened after restoring a site")
+        target.mouse.move(570,310)
+        target.mouse.click(570,310)
+        target.wait_for_function("getComputedStyle(document.querySelector('#modal')).display==='none'",timeout=8000)
+        check(len(broker(popup,"ADMIN_READ",{"origin":origin})["state"]["rules"])==1,
+              "Reselection works without duplicate rules")
+
+        # Exercise the actual extension popup's layout, theme and saved-choice UI.
+        popup.evaluate("async tab=>chrome.tabs.update(tab,{active:true})",tab_id)
+        popup.reload(wait_until="domcontentloaded")
+        popup.wait_for_function("document.getElementById('domain')?.textContent.includes('127.0.0.1')",timeout=9000)
+        check(popup.locator("#rules .rule").count()==1,
+              "Actual popup renders the saved rule without mocked Chrome APIs")
+        check(popup.evaluate("document.body.scrollWidth <= 390"),
+              "Popup has no horizontal overflow at its intended viewport width")
+        popup.locator("#theme").select_option("dark")
+        check(popup.evaluate("getComputedStyle(document.body).backgroundColor")=="rgb(16, 16, 16)",
+              "ADMINE dark theme uses site-aligned background tokens")
+        (ROOT/"tests"/"output").mkdir(parents=True,exist_ok=True)
+        popup.set_viewport_size({"width":390,"height":650})
+        popup.screenshot(path=str(ROOT/"tests"/"output"/"vanish-popup-dark.png"))
+        popup.locator("#theme").select_option("light")
+        check(popup.evaluate("getComputedStyle(document.body).backgroundColor")=="rgb(245, 244, 240)",
+              "ADMINE light theme uses site-aligned background tokens")
+        popup.screenshot(path=str(ROOT/"tests"/"output"/"vanish-popup-light.png"))
+        check(popup.locator("#forget-all").is_visible() is False,
+              "Destructive global action stays behind expandable controls")
+        popup.locator(".site-controls summary").click()
+        check(popup.locator("#forget-all").is_visible(),
+              "Advanced controls expand intentionally")
 
         result=broker(popup,"ADMIN_FORGET_HOST",{"hostname":"127.0.0.1"})
         check(result.get("ok") is True,"Complete hostname revocation succeeded")

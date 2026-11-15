@@ -14,7 +14,7 @@ A lightweight Chrome extension for selecting and hiding unwanted page elements.
 
 ## The idea
 
-Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools.
+Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools. Version 1.4 brings a cleaner ADMINE interface and more reliable restoration on busy websites.
 
 **Click Vanish → choose an element → continue browsing.** Vanish remembers your selection for that website. If you change your mind, undo it.
 
@@ -76,12 +76,12 @@ You can also clone the repository and load its root folder directly. The project
 | Hold **Shift** while selecting | Select the precise element beneath the pointer |
 | Press **Esc** | Cancel without saving |
 | **Undo last** | Restore the most recent saved selection |
-| **Restore origin** | Clear saved selections for the current site origin |
+| **Restore site** | Clear saved selections for the current site origin |
 | **Enabled** switch | Temporarily pause or resume saved rules |
-| **Forget hostname** | Clear that hostname's rules and revoke its site permissions |
-| **Purge all sites** | Clear every Vanish rule and site approval |
+| **Forget this site** | Clear that hostname's rules and revoke its site permissions |
+| **Clear all sites** | Clear every Vanish rule and site approval, after confirmation |
 
-Refreshing an already-open tab may be required after permissions are revoked.
+Refreshing an already-open tab may be required after permissions are revoked or when upgrading to a new extension version. Vanish checks whether the open page has an older picker and asks for a reload instead of silently running mismatched code.
 
 ## Privacy
 
@@ -106,7 +106,7 @@ When Vanish cannot safely identify an element, it should decline the selection r
 
 ## Build quality
 
-The repository includes tests for permissions, local data handling, page-element selection, restoration and browser behaviour. GitHub Actions runs both source checks and real, unpacked Chromium tests before producing a release candidate.
+The repository includes tests for permissions, local data handling, page-element selection, restoration and browser behaviour. The v1.4 browser suite also tests dialogs moving in the DOM, websites reapplying inline display styles, high mutation activity, repeat selection, popup theme switching and layout overflow. GitHub Actions runs both source checks and real, unpacked Chromium tests before producing a release candidate.
 
 [View verification runs](https://github.com/0xdx-au/vanish/actions/workflows/verify.yml) · [Review the source](https://github.com/0xdx-au/vanish)
 

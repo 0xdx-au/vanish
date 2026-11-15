@@ -5,13 +5,14 @@
   globalThis.__admineVanishReady = true;
 
   const ORIGIN = location.origin;
-  const KEY = "vanish.rules.v3." + encodeURIComponent(ORIGIN);
+  const CLIENT_VERSION = "1.4.0";
   const STYLE_ID = "__admine_vanish_rules";
   const MAX_RULES = 24;
-  const MAX_SELECTOR = 480;
+  const MAX_SELECTOR = 650;
   const MAX_MATCHES = 8;
   const MAX_SCAN_MS = 16;
-  const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em"]);
+  const SAFE_TAGS = new Set(["body","div","section","article","aside","main","header","footer","nav","dialog","span","p","h1","h2","h3","h4","h5","h6","ul","li","ol","table","tbody","thead","tfoot","tr","td","th","a","button","form","fieldset","label","details","summary","figure","figcaption","picture","img","svg","canvas","blockquote","pre","code","small","strong","em","iframe","video","audio","ins","address","picture","time","output"]);
+  const SEMANTIC_SELECTORS = new Set(['html > body [role="dialog"][aria-modal="true"]', 'html > body dialog[open]']);
   const HINT = /modal|dialog|pop.?up|overlay|interstitial|lightbox|adblock|ad.block|backdrop|scrim|dimmer|paywall|consent/i;
   let site = { enabled: true, rules: [] };
   let loaded = false;
@@ -24,6 +25,7 @@
   let stopped = false;
   let safetyPaused = false;
   let churn = 0, churnSince = 0;
+  let cooldown = null;
   let scrollRepair = new Map();
   const hiddenInline = new Map();
 
@@ -36,9 +38,10 @@
 
   function validSelector(selector) {
     // Validate structural selectors.
-    const grammar = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,18}$/;
-    if (typeof selector !== "string" || selector.length > MAX_SELECTOR || !grammar.test(selector) ||
-        !selector.split(/\s*>\s*/).slice(1).every(segment=>SAFE_TAGS.has(segment.split(":")[0]))) return false;
+    const grammar = /^html\s*>\s*body(?:\s*>\s*[a-z][a-z0-9-]*(?::nth-of-type\([1-9]\d{0,2}\))?){1,25}$/;
+    if (typeof selector !== "string" || selector.length > MAX_SELECTOR) return false;
+    if (!SEMANTIC_SELECTORS.has(selector) && (!grammar.test(selector) ||
+        !selector.split(/\s*>\s*/).slice(1).every(segment=>SAFE_TAGS.has(segment.split(":")[0])))) return false;
     try { document.querySelector(selector); return true; } catch { return false; }
   }
   function normalise(value) {
@@ -128,15 +131,14 @@
           const found = document.querySelectorAll(selector);
           if (found.length > MAX_MATCHES) { pauseForSafety("Rule matched too many elements"); return; }
           for (const node of found) {
-            if (performance.now() - started > MAX_SCAN_MS) { pauseForSafety("Rule processing exceeded budget"); return; }
+            if (performance.now() - started > MAX_SCAN_MS) { scheduleScan(800); return; }
             if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) continue;
             matched.add(node);
             if (rule.unlockScroll) overlayMatch = true;
-            if (getComputedStyle(node).display !== "none") {
-              if (!hiddenInline.has(node)) hiddenInline.set(node, snapshot(node, "display"));
-              if (node.style.getPropertyValue("display") !== "none" || node.style.getPropertyPriority("display") !== "important") {
-                node.style.setProperty("display", "none", "important");
-              }
+            // Inline!important beats the host page; a stylesheet alone is not enough.
+            if (!hiddenInline.has(node)) hiddenInline.set(node, snapshot(node, "display"));
+            if (node.style.getPropertyValue("display") !== "none" || node.style.getPropertyPriority("display") !== "important") {
+              node.style.setProperty("display", "none", "important");
             }
           }
         } catch { /* DOM changed. */ }
@@ -149,9 +151,9 @@
     else restoreScroll();
   }
 
-  function scheduleScan() {
-    if (stopped || safetyPaused || scanTimeout !== null) return;
-    scanTimeout = setTimeout(scan, 240);
+  function scheduleScan(delay = 240) {
+    if (stopped || safetyPaused || scanTimeout !== null || cooldown !== null) return;
+    scanTimeout = setTimeout(scan, delay);
   }
   function pauseForSafety(reason) {
     safetyPaused = true;
@@ -159,6 +161,8 @@
     observer = null;
     if (scanTimeout !== null) clearTimeout(scanTimeout);
     scanTimeout = null;
+    if (cooldown !== null) clearTimeout(cooldown);
+    cooldown = null;
     cancelInlineOverrides();
     restoreScroll();
     ruleStyle?.remove(); ruleStyle = null;
@@ -173,10 +177,33 @@
     }
     if (!observer) {
       observer = new MutationObserver(records => {
+        const meaningful = records.filter(record => {
+          if (record.type === "childList" || record.attributeName !== "style") return true;
+          if (hiddenInline.has(record.target)) {
+            return record.target.style.getPropertyValue("display") !== "none" ||
+              record.target.style.getPropertyPriority("display") !== "important";
+          }
+          if (scrollRepair.has(record.target)) {
+            return record.target.style.getPropertyValue("overflow-y") !== "auto" ||
+              record.target.style.getPropertyPriority("overflow-y") !== "important";
+          }
+          return true;
+        });
+        if (!meaningful.length) return;
         const now = performance.now();
         if (!churnSince || now - churnSince > 3000) { churnSince = now; churn = 0; }
-        churn += records.length;
-        if (churn > 1000) { pauseForSafety("Excessive page mutation activity"); return; }
+        churn += meaningful.length;
+        if (churn > 1000) {
+          // Back off on busy pages without discarding any rules or stopping CSS.
+          observer?.disconnect(); observer = null;
+          if (scanTimeout !== null) clearTimeout(scanTimeout);
+          scanTimeout = null;
+          cooldown = setTimeout(() => {
+            cooldown = null; churn = 0; churnSince = 0;
+            if (!stopped && !safetyPaused) { watch(); scheduleScan(0); }
+          }, 1200);
+          return;
+        }
         scheduleScan();
       });
       observer.observe(document.documentElement, {
@@ -220,7 +247,7 @@
     if (node.closest("input,textarea,select,[contenteditable=true]")) return null;
     const parts = [];
     let current = node;
-    while (current && current.localName !== "html" && parts.length < 19) {
+    while (current && current.localName !== "html" && parts.length < 26) {
       const tag = current.localName;
       if (!SAFE_TAGS.has(tag)) return null;
       const siblings = current.parentElement ?
@@ -233,6 +260,17 @@
     if (!current || current.localName !== "html" || parts[0] !== "body") return null;
     const candidate = "html > " + parts.join(" > ");
     return validSelector(candidate) && unique(candidate) ? candidate : null;
+  }
+  function semanticFor(node) {
+    if (node.matches('[role="dialog"][aria-modal="true"]')) {
+      const selector = 'html > body [role="dialog"][aria-modal="true"]';
+      if (unique(selector)) return selector;
+    }
+    if (node.matches("dialog[open]")) {
+      const selector = 'html > body dialog[open]';
+      if (unique(selector)) return selector;
+    }
+    return null;
   }
   function rectUsable(rect) {
     return rect.width >= 25 && rect.height >= 20 && rect.bottom > 0 && rect.right > 0 &&
@@ -248,13 +286,13 @@
       const style = getComputedStyle(node);
       const name = node.id + " " + (typeof node.className === "string" ? node.className : "");
       const large = rect.width > 150 && rect.height > 100;
-      if (large && (node.matches("dialog,[role=dialog],[aria-modal=true]") || HINT.test(name))) dialog = node;
-      if (large && ["fixed", "absolute", "sticky"].includes(style.position) &&
+      if (!dialog && large && (node.matches("dialog,[role=dialog],[aria-modal=true]") || HINT.test(name))) dialog = node;
+      if (!positioned && large && ["fixed", "absolute", "sticky"].includes(style.position) &&
           rect.width * rect.height < innerWidth * innerHeight * 1.12) positioned = node;
-      if (style.position === "fixed" && rect.width >= innerWidth * .85 && rect.height >= innerHeight * .85 &&
+      if (!fullscreen && style.position === "fixed" && rect.width >= innerWidth * .85 && rect.height >= innerHeight * .85 &&
           (HINT.test(name) || Number(style.zIndex) > 1)) fullscreen = node;
     }
-    return fullscreen || dialog || positioned || start;
+    return dialog || positioned || fullscreen || start;
   }
   function looksLikeBackdrop(node) {
     if (!(node instanceof Element)) return false;
@@ -297,12 +335,14 @@
     const style = element("style");
     style.textContent = [
       "*{box-sizing:border-box}",
-      ".bar{position:absolute;left:50%;top:16px;transform:translateX(-50%);max-width:calc(100vw - 24px);display:flex;align-items:center;gap:12px;background:#101516;color:#edf3ed;padding:12px 13px;border:1px solid #344343;border-radius:9px;box-shadow:0 8px 36px #0007;font:12px/1.4 system-ui,sans-serif;pointer-events:auto}",
-      ".mark{color:#EA87C3;font-weight:900;font-size:19px}",
-      ".copy{min-width:0}.copy strong{display:block;white-space:normal}.copy small{display:block;color:#a2b1ac;font-size:10px;margin-top:3px}",
-      "button{background:#293434;color:#fff;border:1px solid #4c6260;border-radius:5px;padding:7px 10px;font:700 11px system-ui;cursor:pointer}",
-      "button:focus-visible{outline:2px solid #EA87C3;outline-offset:2px}",
-      ".outline{position:fixed;display:none;pointer-events:none;border:3px solid #EA87C3;background:#EA87C322;box-shadow:0 0 0 2px #101516,0 0 0 4px #EA87C3;border-radius:3px}"
+      ".bar{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);display:flex;align-items:center;gap:12px;background:#101010;color:#f5f4f0;padding:10px 12px;border:1px solid #53514d;border-radius:6px;box-shadow:0 8px 28px #0007;font:12px/1.5 system-ui,sans-serif;pointer-events:auto}",
+      ".mark{color:#ff95ca;font-weight:900;font-size:16px;letter-spacing:-.05em}",
+      ".copy{min-width:0}.copy strong{display:block;white-space:normal;font-size:12px}.copy small{display:block;color:#bdbbb3;font-size:10px;margin-top:2px}",
+      "button{background:#252525;color:#f5f4f0;border:1px solid #555;border-radius:4px;padding:7px 10px;font:700 11px system-ui;cursor:pointer;min-height:34px}",
+      "button:focus-visible{outline:2px solid #ff95ca;outline-offset:2px}",
+      ".outline{position:fixed;display:none;pointer-events:none;border:2px solid #ff95ca;background:#ff95ca20;box-shadow:0 0 0 2px #101010,0 0 0 3px #ff95ca;border-radius:2px}",
+      "@media(max-width:480px){.bar{top:auto;bottom:max(12px,env(safe-area-inset-bottom));gap:8px;padding:9px}}",
+      "@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}"
     ].join("\n");
     root.append(style);
     document.documentElement.append(host);
@@ -385,7 +425,8 @@
   async function save(target, exact) {
     const primary = selectorFor(target);
     if (!primary) return show("Couldn't hide this", "Try selecting a different part of the item.");
-    const sel = [primary, ...(exact ? [] : backdrops(target))].filter((value,index,all)=>all.indexOf(value)===index);
+    const sel = [primary, ...(exact ? [] : [semanticFor(target), ...backdrops(target)])]
+      .filter((value,index,all)=>value && all.indexOf(value)===index).slice(0,3);
     try {
       const result = await chrome.runtime.sendMessage({
         type: "CONTENT_SAVE", rule: { selectors: sel, unlockScroll: !exact && isOverlay(target) }
@@ -415,7 +456,7 @@
     const bar=element("div","bar");
     const copy=element("div","copy");
     copy.append(element("strong","","VANISH / SELECT AN ELEMENT"),
-      element("small","","Pink outline = target · Shift = exact · Esc = cancel"));
+      element("small","","Click to hide · Shift for precise selection · Esc to cancel"));
     const cancel=element("button","","CANCEL");
     cancel.addEventListener("click",event=>{event.stopPropagation();stopPicker();});
     bar.append(element("span","mark","A."),copy,cancel);
@@ -445,6 +486,8 @@
     observer?.disconnect();observer=null;
     if (scanTimeout !== null) clearTimeout(scanTimeout);
     scanTimeout=null;
+    if (cooldown !== null) clearTimeout(cooldown);
+    cooldown=null;
     cancelInlineOverrides();
     restoreScroll();
     ruleStyle?.remove(); ruleStyle = null;
@@ -469,7 +512,7 @@
     }
     if (message.type === "CANCEL_PICK") {stopPicker();respond({ok:true});}
     else if (message.type === "STATUS") respond({ok:true,enabled:site.enabled,count:site.rules.length,
-      paused:safetyPaused,stopped});
+      paused:safetyPaused,stopped,version:CLIENT_VERSION});
   });
   void loadRules().catch(()=>{site={enabled:false,rules:[]};loaded=true;apply();});
 })();
