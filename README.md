@@ -89,11 +89,11 @@ Open **Vanish → Local signal** to access the extension-owned dashboard. It wor
 
 The dashboard displays:
 - Elements hidden, pages where saved rules matched, restores and protective backoffs
-- Picker starts, cancellations, failed selections, deferred scans and safety pauses
+- Picker starts, cancellations, failed selections, deferred scans and safety pauses (frequent page signals are rate-limited indicators, not an exhaustive event log)
 - A 14-day UTC activity chart and current counts of approved origins and saved rules
 - Controls to pause collection, clear the local activity record and export aggregate JSON to your own computer
 
-Telemetry contains **only fixed-name event counts grouped by UTC date**. No page text, website names, hosts, URLs, selectors, browsing history, personal identifiers, error strings or individual event timestamps are added to that data. Nothing is uploaded, sent to ADMINE, synced by Vanish or shared with a third party. The chart automatically drops old data after 14 UTC calendar days when telemetry is accessed or updated.
+Telemetry contains **only fixed-name event counts grouped by UTC date**. No page text, website names, hosts, URLs, selectors, browsing history, personal identifiers, error strings or individual event timestamps are added to that data. Nothing is uploaded, sent to ADMINE, synced by Vanish or shared with a third party. The chart uses a rolling 14 UTC-calendar-day window. Expired daily buckets are removed from storage the next time telemetry is read or updated.
 
 Switching recording off stops new counts but retains prior aggregates until cleared. **Clear telemetry** removes counters without changing saved hiding rules. **Clear all sites** removes all Vanish rules, permissions, preferences **and telemetry**. Telemetry is stored in Chrome extension-local storage, not an encrypted vault; anyone with control of your Chrome profile may access it. Neither this local-only feature nor Vanish makes the browser or visited websites anonymous.
 
