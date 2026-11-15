@@ -177,10 +177,18 @@
     }
     if (!observer) {
       observer = new MutationObserver(records => {
-        const meaningful = records.filter(record =>
-          record.type === "childList" ||
-          !(record.attributeName === "style" &&
-            (hiddenInline.has(record.target) || scrollRepair.has(record.target))));
+        const meaningful = records.filter(record => {
+          if (record.type === "childList" || record.attributeName !== "style") return true;
+          if (hiddenInline.has(record.target)) {
+            return record.target.style.getPropertyValue("display") !== "none" ||
+              record.target.style.getPropertyPriority("display") !== "important";
+          }
+          if (scrollRepair.has(record.target)) {
+            return record.target.style.getPropertyValue("overflow-y") !== "auto" ||
+              record.target.style.getPropertyPriority("overflow-y") !== "important";
+          }
+          return true;
+        });
         if (!meaningful.length) return;
         const now = performance.now();
         if (!churnSince || now - churnSince > 3000) { churnSince = now; churn = 0; }
