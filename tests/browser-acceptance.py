@@ -214,6 +214,11 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
               "Actual popup renders the saved rule without mocked Chrome APIs")
         check(popup.evaluate("document.body.scrollWidth <= 390"),
               "Popup has no horizontal overflow at its intended viewport width")
+        check(popup.locator('a[href="https://admine.au/vanish-terms"]').is_visible() and
+              popup.locator('a[href="https://admine.au/vanish-privacy"]').is_visible(),
+              "Terms and privacy are visible in the actual installed popup")
+        check(popup.locator('nav.legal-links a').count()==2,
+              "No remote executable or tracking embeds required to display policies")
         popup.locator("#theme").select_option("dark")
         check(popup.evaluate("getComputedStyle(document.body).backgroundColor")=="rgb(16, 16, 16)",
               "ADMINE dark theme uses site-aligned background tokens")

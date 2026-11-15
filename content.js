@@ -5,7 +5,7 @@
   globalThis.__admineVanishReady = true;
 
   const ORIGIN = location.origin;
-  const CLIENT_VERSION = "1.4.0";
+  const CLIENT_VERSION = "1.4.1";
   const STYLE_ID = "__admine_vanish_rules";
   const MAX_RULES = 24;
   const MAX_SELECTOR = 650;

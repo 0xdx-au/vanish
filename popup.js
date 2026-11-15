@@ -9,7 +9,7 @@
     status: $("status"), theme: $("theme"), site: document.querySelector(".current-site")
   };
   const PREF = "vanish.preferences";
-  const CLIENT_VERSION = "1.4.0";
+  const CLIENT_VERSION = "1.4.1";
   let tabId = null, origin = null, hostname = null;
   let state = { enabled: true, rules: [] };
   let approved = false, ready = false, busy = false, refreshId = 0, confirmAll = false;

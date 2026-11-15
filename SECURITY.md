@@ -2,9 +2,17 @@
 
 Vanish has privileged access to approved webpages. It is a **visual-cleanup tool**, not a paywall bypass or independently audited security product. Do not submit sensitive URLs, page contents, private browser data or vulnerabilities through public comments or GitHub issues. Use the ADMINE private contact route at https://admine.au/security/ .
 
+## Supported stable releases and reports
+
+The current supported package is the latest source-verified stable Vanish build. Test dependencies are pinned to released versions, and changes require real Chromium acceptance checks before producing an installable package. Nightly, beta and development snapshots are not published as stable builds.
+
+We welcome reproducible bug reports and commit to reviewing and attempting feasible fixes, prioritising security and privacy. Reports requiring account authentication on GitHub are not fully anonymous; avoid sharing secrets or identifying browsing content. A fix or response time cannot be guaranteed.
+
+Public [Vanish terms](https://admine.au/vanish-terms) and [privacy policy](https://admine.au/vanish-privacy) describe the current user-facing position; these do not override statutory consumer rights.
+
 ## Security boundaries
 
-Version 1.3 enforces:
+Version 1.4.1 enforces:
 - **Incognito prohibited** using a manifest declaration.
 - **No page text persistence:** only validated structural selectors, generic UI labels and exact origin identifiers are stored locally.
 - **Origin approval via trusted worker:** all content-script storage goes through `background.js`, with exact origin checks. Chrome host permission itself cannot isolate ports.

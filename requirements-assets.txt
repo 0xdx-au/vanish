@@ -1,0 +1,4 @@
+# Verified stable store-asset tooling. Reviewed upgrades only; no nightlies.
+playwright==1.65.2
+pillow==13.0.0
+CairoSVG==2.9.0
