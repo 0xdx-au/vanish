@@ -157,7 +157,7 @@ test("ADMINE popup is compact, accessible and requires confirmation for global r
   assert.match(styles, /width:390px/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(html, /<details class="site-controls">/);
-  assert.match(popup, /CLIENT_VERSION = "1\.4\.1"/);
+  assert.match(popup, /CLIENT_VERSION = "1\.5\.0"/);
   assert.match(popup, /Confirm clearing every site/);
   assert.match(html, /aria-live="polite"/);
   assert.doesNotMatch(html, /Pink outline|NO EXTENSION EGRESS/i);
@@ -172,7 +172,7 @@ test("stable-only 1.4.1 release links terms and privacy without remote executabl
   assert.ok(html.includes('href="' + policy + '"'));
   assert.match(html, /rel="noopener noreferrer"/);
   assert.ok(readme.includes(terms) && readme.includes(policy));
-  assert.match(read("SECURITY.md"), /Version 1\.4\.1 enforces/);
+  assert.match(read("SECURITY.md"), /Version 1\.5\.0 enforces/);
   assert.match(read("SECURITY.md"), /Nightly, beta and development snapshots are not published/);
   assert.match(read(".github/workflows/verify.yml"), /requirements-ci\.txt/);
   assert.match(read(".github/workflows/store-assets.yml"), /requirements-assets\.txt/);
