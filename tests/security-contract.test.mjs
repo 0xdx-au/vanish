@@ -157,7 +157,7 @@ test("ADMINE popup is compact, accessible and requires confirmation for global r
   assert.match(styles, /width:390px/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(html, /<details class="site-controls">/);
-  assert.match(popup, /CLIENT_VERSION = "1\.4\.0"/);
+  assert.match(popup, /CLIENT_VERSION = "1\.4\.1"/);
   assert.match(popup, /Confirm clearing every site/);
   assert.match(html, /aria-live="polite"/);
   assert.doesNotMatch(html, /Pink outline|NO EXTENSION EGRESS/i);
