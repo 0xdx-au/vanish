@@ -5,7 +5,7 @@
   globalThis.__admineVanishReady = true;
 
   const ORIGIN = location.origin;
-  const CLIENT_VERSION = "1.4.1";
+  const CLIENT_VERSION = "1.5.0";
   const STYLE_ID = "__admine_vanish_rules";
   const MAX_RULES = 24;
   const MAX_SELECTOR = 650;
@@ -28,6 +28,13 @@
   let cooldown = null;
   let scrollRepair = new Map();
   const hiddenInline = new Map();
+  let pageCleanedReported = false;
+
+  function signal(event) {
+    // Fixed-name, best-effort notification; never attach page information.
+    try { void chrome.runtime.sendMessage({ type: "CONTENT_SIGNAL", event }).catch(() => {}); }
+    catch { /* Browser context may already have closed. */ }
+  }
 
   const element = (tag, klass, text) => {
     const node = document.createElement(tag);
@@ -131,7 +138,7 @@
           const found = document.querySelectorAll(selector);
           if (found.length > MAX_MATCHES) { pauseForSafety("Rule matched too many elements"); return; }
           for (const node of found) {
-            if (performance.now() - started > MAX_SCAN_MS) { scheduleScan(800); return; }
+            if (performance.now() - started > MAX_SCAN_MS) { signal("scan_deferred"); scheduleScan(800); return; }
             if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) continue;
             matched.add(node);
             if (rule.unlockScroll) overlayMatch = true;
@@ -147,6 +154,7 @@
     for (const [node, original] of hiddenInline) {
       if (!matched.has(node)) { restore(node, "display", original); hiddenInline.delete(node); }
     }
+    if (matched.size && !pageCleanedReported) { pageCleanedReported = true; signal("page_cleaned"); }
     if (overlayMatch) unlockScroll();
     else restoreScroll();
   }
@@ -156,6 +164,7 @@
     scanTimeout = setTimeout(scan, delay);
   }
   function pauseForSafety(reason) {
+    signal("safety_paused");
     safetyPaused = true;
     observer?.disconnect();
     observer = null;
@@ -194,6 +203,7 @@
         if (!churnSince || now - churnSince > 3000) { churnSince = now; churn = 0; }
         churn += meaningful.length;
         if (churn > 1000) {
+          signal("mutation_backoff");
           // Back off on busy pages without discarding any rules or stopping CSS.
           observer?.disconnect(); observer = null;
           if (scanTimeout !== null) clearTimeout(scanTimeout);
@@ -409,7 +419,7 @@
   function cancelKey(event) {
     if (event.key==="Escape") {
       event.preventDefault();event.stopImmediatePropagation();
-      stopPicker();show("Cancelled", "No change made.");
+      stopPicker();signal("picker_cancelled");show("Cancelled", "No change made.");
     }
   }
   function stopPicker() {
@@ -424,7 +434,7 @@
   }
   async function save(target, exact) {
     const primary = selectorFor(target);
-    if (!primary) return show("Couldn't hide this", "Try selecting a different part of the item.");
+    if (!primary) { signal("picker_failed"); return show("Couldn't hide this", "Try selecting a different part of the item."); }
     const sel = [primary, ...(exact ? [] : [semanticFor(target), ...backdrops(target)])]
       .filter((value,index,all)=>value && all.indexOf(value)===index).slice(0,3);
     try {
@@ -437,6 +447,7 @@
       apply();
       show("Gone!", "Saved for this website.", result.id);
     } catch (error) {
+      signal("picker_failed");
       show("Couldn't save", "Try again or choose another element.");
     }
   }
@@ -447,7 +458,7 @@
     const exact=event.shiftKey;
     stopPicker();
     if (node) void save(node,exact);
-    else show("Nothing selected","Try the middle of the popup.");
+    else { signal("picker_failed"); show("Nothing selected","Try the middle of the popup."); }
   }
   function startPicker() {
     if (!document.documentElement) return {ok:false,error:"Document not ready"};
@@ -458,7 +469,7 @@
     copy.append(element("strong","","VANISH / SELECT AN ELEMENT"),
       element("small","","Click to hide · Shift for precise selection · Esc to cancel"));
     const cancel=element("button","","CANCEL");
-    cancel.addEventListener("click",event=>{event.stopPropagation();stopPicker();});
+    cancel.addEventListener("click",event=>{event.stopPropagation();stopPicker();signal("picker_cancelled");});
     bar.append(element("span","mark","A."),copy,cancel);
     const outline=element("div","outline");
     ui.root.append(outline,bar);
@@ -469,6 +480,7 @@
     document.addEventListener("mouseup",swallow,true);
     document.addEventListener("click",pickClick,true);
     document.addEventListener("keydown",cancelKey,true);
+    signal("picker_started");
     return {ok:true};
   }
 
