@@ -6,7 +6,7 @@
 
 A lightweight Chrome extension for selecting and hiding unwanted page elements.
 
-[**Try the interactive ADMINE demo**](https://admine.au/projects/vanish/#v-demo) · [Install](#install) · [Screenshots](#see-vanish-in-action) · [Privacy](#privacy) · [Licence](#licence)
+[**Try the interactive ADMINE demo**](https://admine.au/projects/vanish/#v-demo) · [Install](#install) · [Screenshots](#see-vanish-in-action) · [Privacy](#privacy) · [Terms](https://admine.au/vanish-terms) · [Licence](#licence)
 
 </div>
 
@@ -14,7 +14,7 @@ A lightweight Chrome extension for selecting and hiding unwanted page elements.
 
 ## The idea
 
-Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools. Version 1.4 brings a cleaner ADMINE interface and more reliable restoration on busy websites.
+Some sites put banners, floating boxes, newsletter prompts and overlays in front of what you're trying to read. Vanish gives you a simple way to remove the *visual obstruction* without digging through developer tools. Version 1.4.1 brings a cleaner ADMINE interface, clearer privacy and terms links, and more reliable restoration on busy websites.
 
 **Click Vanish → choose an element → continue browsing.** Vanish remembers your selection for that website. If you change your mind, undo it.
 
@@ -94,7 +94,15 @@ Rules are stored locally in Chrome and can be removed at any time. Chrome and th
 - **Incognito mode is not supported.**
 - Removing an overlay cannot guarantee that a website will continue working.
 
-For the **Chrome Web Store privacy policy**, use [Vanish's dedicated HTTPS policy](https://admine.au/vanish-privacy). For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md).
+For the official **Chrome Web Store privacy policy**, use [Vanish's dedicated HTTPS policy](https://admine.au/vanish-privacy), and read the [plain-language terms](https://admine.au/vanish-terms) alongside the [PolyForm Noncommercial licence](LICENSE). For implementation details, audits, test coverage and known limitations, see [Security](SECURITY.md) and the [privacy and threat model](docs/PRIVACY-AND-THREAT-MODEL.md).
+
+## Anonymity, bug reports and stable releases
+
+You can use Vanish without an ADMINE account or revealing your identity to ADMINE. Your saved choices stay in your Chrome profile. **This is not anonymity from websites, Chrome, your device or network provider.** Visiting ADMINE's website involves ordinary Cloudflare delivery and security processing.
+
+ADMINE commits to reviewing actionable bug reports and working to fix reproducible faults where technically feasible, with security and privacy defects prioritised. A particular website may prevent a fix; no guaranteed resolution time or perfect compatibility is promised. For sensitive reports, use the [private disclosure route](https://admine.au/security/). GitHub may require an account to submit a report.
+
+Release builds and test tools use reviewed, stable version pins, not nightly, beta or prerelease dependencies. Dependency upgrades are proposed via reviewable pull requests and must pass the existing security/Chromium tests before packaging.
 
 ## Compatibility and limits
 
