@@ -1,4 +1,4 @@
-# VANISH v1.3 — privacy, boundaries and threat model
+# VANISH v1.5 — privacy, boundaries and threat model
 
 **Chrome Web Store policy for users:** https://admine.au/vanish-privacy
 
@@ -10,11 +10,17 @@ This document is the technical supplement; the public HTML policy is the address
 
 A user-activated permission prompt grants Chrome access to an HTTP(S) **hostname + scheme**. Chrome host match patterns **cannot differentiate ports**, so permission applies across those ports; the trusted broker independently authorises the exact **origin**, including port, before allowing a rule read/write. It uses the key `vanish.rules.v3.` + `encodeURIComponent(origin)`.
 
-Stored rule schema: `{enabled:boolean,rules:[{id,selectors,unlockScroll}]}`, with a maximum of 24 rules and three selectors per rule. **No captured page text, arbitrary element label, form value, timestamp, URL path, query string or page contents are persisted.** Structural tag paths and nth-of-type values still reveal some page structure, and the locally retained origin list reveals site origins. Storage is not encrypted.
+Stored rule schema: `{enabled:boolean,rules:[{id,selectors,unlockScroll}]}`, with a maximum of 24 rules and three selectors per rule. **Rule records contain no page text, arbitrary element label, form value, per-rule timestamp, URL path, query string or page contents.** Structural tag paths and nth-of-type values still reveal some page structure, and the locally retained origin list reveals site origins. Storage is not encrypted.
 
 The content script cannot directly access extension storage. The `background.js` Manifest V3 service worker calls `chrome.storage.local.setAccessLevel({accessLevel:"TRUSTED_CONTEXTS"})`, validates sender identity and frame, checks origin-specific approval plus Chrome host permission, and permits only approved rule operations. The service worker contains no network API.
 
-On first v1.3 startup/upgrade, a fail-closed migration **deletes all legacy v1.2 hostname rules and their page-derived text labels**, drops existing dynamic Vanish scripts and host permissions, and requires user re-approval. Old already-injected tabs must be reloaded: Chrome cannot forcibly remove an extension script from an existing page.
+On the original v1.3 startup/upgrade, a fail-closed migration **deletes all legacy v1.2 hostname rules and their page-derived text labels**, drops existing dynamic Vanish scripts and host permissions, and requires user re-approval. Old already-injected tabs must be reloaded: Chrome cannot forcibly remove an extension script from an existing page.
+
+### Optional Local Signal telemetry
+
+Version 1.5 adds an extension-owned, **off-by-default** activity dashboard under `dashboard.html`. Its `vanish.telemetry.v1` entry has the shape `{version:1,enabled:boolean,days:[{day:'YYYY-MM-DD',counts:{fixedName:integer}}]}`. It retains at most 14 UTC calendar-day buckets, not individual events. The broker whitelists each counter name, limits counts, and serialises updates. It does **not** include an origin, hostname, URL, path, structural selector, page content, error string or persistent analytics identifier. The date bucket itself reveals a coarse day of extension usage, so users should not mistake it for anonymity from someone with local profile access.
+
+Only `dashboard.html` may read, toggle or clear telemetry. An approved top-level content script may submit an enumerated, rate-limited `CONTENT_SIGNAL`; unapproved origins and cross-frame senders remain denied. No page-supplied text is persisted. Clicking **Clear telemetry** clears daily buckets. Global **Clear all sites** removes the telemetry key. Disabling collection keeps existing buckets until explicitly cleared; it does not affect saved hiding rules. No extension code implements an analytics endpoint or network request.
 
 ## 2 / Interaction and revocation
 
@@ -34,10 +40,10 @@ A hostile page can recreate the overlay, replace DOM nodes, spoof the appearance
 | Popup | None | Assets local, extension-page `connect-src 'none'` |
 | Content script | None | DOM, messaging to browser internal extension broker only |
 | Service worker | None | Storage and Chrome permissions APIs only; no fetch/network use |
-| CDN, fonts, analytics, telemetry | None | No remote assets or developer endpoint |
+| Remote analytics, fonts or telemetry endpoint | None | No remote assets, publisher server or network sink |\n| Local Signal dashboard | None | Opt-in daily aggregate counters stored only in trusted extension-local storage |
 | Chrome / host website / other extensions | Outside Vanish control | They can continue to make ordinary requests |
 
-**"No extension-initiated application-level egress" is not "zero network traffic from the device."** DOM modifications may be observable by the website, which can transmit its own telemetry. The browser may communicate with vendors for updates, diagnostics and other reasons. Test coverage captures fixture traffic and extension behaviour in Chromium; it cannot see all operating-system or browser service traffic. No source review proves an absolute future guarantee.
+**"No extension-initiated application-level egress" is not "zero network traffic from the device."** DOM modifications may be observable by the website, which can transmit its own telemetry. The browser may communicate with vendors for updates, diagnostics and other reasons. Test coverage captures fixture traffic and extension behaviour in Chromium; it cannot see all operating-system or browser service traffic. No source review proves an absolute future guarantee. Local telemetry is not a claim of network anonymity.
 
 ## 4 / CI supply chain
 
