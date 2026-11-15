@@ -23,6 +23,7 @@ jobs:
       - run: |
           node --check background.js
           node --check popup.js
+          node --check dashboard.js
           node --check content.js
           node --test tests/security-contract.test.mjs
 
@@ -52,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: vanish-v1.4-popup-visual-qa-${{ github.run_id }}
+          name: vanish-v1.5-visual-qa-${{ github.run_id }}
           path: tests/output/*.png
           if-no-files-found: ignore
           retention-days: 14
@@ -73,7 +74,7 @@ jobs:
       - name: Upload reviewed build candidate (not automatically published)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: vanish-v1.4.1-verified-source-${{ github.run_id }}
-          path: dist/Vanish-extension-v1.4.1.zip
+          name: vanish-v1.5.0-verified-source-${{ github.run_id }}
+          path: dist/Vanish-extension-v1.5.0.zip
           if-no-files-found: error
           retention-days: 30
