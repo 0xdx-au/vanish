@@ -14,7 +14,7 @@ const SAFE_TAGS = new Set(["body","div","section","article","aside","main","head
 function safeSelector(value) {
   return typeof value === "string" && value.length <= MAX_SELECTOR &&
     (SEMANTIC_SELECTORS.has(value) || (SELECTOR.test(value) &&
-    value.split(/\s*>\s*/).slice(1).every(segment => SAFE_TAGS.has(segment.split(":")[0])));
+    value.split(/\s*>\s*/).slice(1).every(segment => SAFE_TAGS.has(segment.split(":")[0]))));
 }
 const OPTIONS = { enabled: true, rules: [] };
 
