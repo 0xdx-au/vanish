@@ -256,8 +256,11 @@ with TemporaryDirectory(prefix="vanish-mv3-") as profile, sync_playwright() as p
         popup.wait_for_function("document.getElementById('domain')?.textContent.includes('127.0.0.1')",timeout=9000)
         check(popup.locator("#rules .rule").count()==1,
               "Actual popup renders the saved rule without mocked Chrome APIs")
-        check(popup.evaluate("document.body.scrollWidth <= 390"),
-              "Popup has no horizontal overflow at its intended viewport width")
+        popup.set_viewport_size({"width":390,"height":650})
+        check(popup.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"),
+              "Popup has no horizontal scrolling with its real viewport scrollbar")
+        check(popup.evaluate("document.querySelector('.app').getBoundingClientRect().right <= document.documentElement.clientWidth + 1"),
+              "Popup controls stay inside the visible content area")
         check(popup.locator("#dashboard").is_visible(),
               "Popup always offers local telemetry without visiting a website")
         check(popup.locator('a[href="https://admine.au/vanish-terms"]').is_visible() and
